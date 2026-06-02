@@ -203,6 +203,17 @@ router.patch("/orders/:id/status", async (req, res): Promise<void> => {
     `);
   }
 
+  // Auto-delete customer if cancelled and they have no other orders
+  if (parsed.data.status === "cancelled" && row.customerId) {
+    const otherOrders = await db
+      .select({ id: ordersTable.id })
+      .from(ordersTable)
+      .where(and(eq(ordersTable.customerId, row.customerId), sql`${ordersTable.id} != ${row.id}`));
+    if (otherOrders.length === 0) {
+      await db.delete(customersTable).where(eq(customersTable.id, row.customerId));
+    }
+  }
+
   const full = await getFullOrder(row.id);
   res.json(full);
 });
