@@ -1,0 +1,404 @@
+# Build a Real-Time KOT & Billing App for “The Waffle Hub BCM”
+
+I want to build a simple, fast, modern, and low-cost KOT (Kitchen Order Ticket) + Billing + Customer Management application for my waffle business called “The Waffle Hub BCM”.
+
+The application should work in real-time across multiple devices without needing expensive POS hardware or printers.
+
+The goal is to create a lightweight but scalable food-order management system optimized for speed, simplicity, and practical daily operations.
+
+---
+
+# Core Business Workflow
+
+## Counter Device
+
+Staff takes orders from:
+
+* Laptop
+* Tablet
+* Mobile
+
+## Kitchen Device
+
+Kitchen staff should instantly see orders on:
+
+* Mobile phone
+* Tablet
+* Laptop
+
+No manual refresh should be needed.
+
+All devices must sync live in real time.
+
+---
+
+# 1. Order Taking System
+
+The app should allow staff to create orders with:
+
+* Customer Name
+* Mobile Number
+* Order Type:
+
+  * Dine In
+  * Takeaway
+  * Delivery
+
+Each order should automatically generate:
+
+* Unique Order ID
+* Order Time
+* Estimated Ready Time
+
+Default waiting/preparation time:
+
+* Automatically add 10 minutes from order creation time
+
+Example:
+
+* Order placed at 5:00 PM
+* Ready time shown as 5:10 PM
+
+---
+
+# 2. Fast Clickable Menu System
+
+Need a touch-friendly clickable menu interface for fast order taking.
+
+Menu should include:
+
+* Product Name
+* Category
+* Price
+* Quantity Selector
+* Optional Add-ons
+
+Example categories:
+
+* Waffles
+* Pancakes
+* Beverages
+* Ice Cream
+* Add-ons
+
+Features:
+
+* One-click item adding
+* Increase/decrease quantity
+* Remove item
+* Live subtotal calculation
+* Automatic grand total calculation
+
+The UI should be optimized for very fast billing during rush hours.
+
+---
+
+# 3. Real-Time Kitchen Display System (Most Important)
+
+When counter staff places an order:
+
+* It should instantly appear on kitchen screen/device
+
+Kitchen view should display:
+
+* Order Number
+* Customer Name
+* Ordered Items
+* Quantity
+* Special Instructions
+* Order Time
+* Remaining Time Countdown
+* Order Status
+
+Kitchen staff should be able to update status:
+
+* Preparing
+* Ready
+* Completed
+* Cancelled
+
+When kitchen marks order “Ready”:
+
+* Counter screen should update instantly
+
+Orders should auto-sort:
+
+* Oldest pending order first
+
+Need:
+
+* Large readable text
+* Dark mode UI
+* Color-coded statuses
+* Notification sound for new orders
+
+Optional:
+
+* Voice alert saying “New Order Received”
+
+---
+
+# 4. Billing & Split Payment System
+
+Need flexible billing system supporting:
+
+* Cash
+* QR / UPI
+* Card (optional)
+
+Very important:
+Support split payments.
+
+Example:
+
+* Total Bill = ₹500
+* Customer pays:
+
+  * ₹200 Cash
+  * ₹300 UPI
+
+System should record both payment methods in same transaction.
+
+Bill should display:
+
+* Total Amount
+* Amount Paid
+* Remaining Balance
+* Payment Status
+
+---
+
+# 5. Dynamic Live Order Dashboard
+
+Need a live dashboard showing:
+
+* Active Orders
+* Ready Orders
+* Completed Orders
+* Cancelled Orders
+
+Dashboard should instantly update whenever:
+
+* New order created
+* Order edited
+* Status changed
+* Order cancelled
+
+Need quick order search by:
+
+* Mobile number
+* Customer name
+* Order ID
+
+---
+
+# 6. Expense Tracking System
+
+Need simple expense management.
+
+Staff should be able to add expenses such as:
+
+* Inventory purchase
+* Milk
+* Chocolate
+* Fruits
+* Packaging
+* Maintenance
+* Staff expenses
+
+Expense fields:
+
+* Expense Title
+* Amount
+* Payment Method
+* Notes
+* Date & Time
+
+System should track:
+
+* Daily expenses
+* Weekly expenses
+* Monthly expenses
+* Remaining cash balance
+
+---
+
+# 7. Product & Menu Management
+
+Admin should be able to:
+
+* Add products
+* Edit products
+* Delete products
+* Change prices
+* Add categories
+* Enable/disable products
+
+No coding should be required.
+
+---
+
+# 8. Customer Database & Marketing
+
+Automatically save:
+
+* Customer Name
+* Mobile Number
+* Order History
+* Total Spending
+* Last Order Date
+* Favorite Products
+
+Need:
+
+* Customer search
+* Export customer database
+* Repeat customer tracking
+
+Future marketing support:
+
+* WhatsApp offers
+* SMS campaigns
+* Seasonal promotions
+
+---
+
+# 9. Reports & Analytics
+
+Need reports for:
+
+* Daily sales
+* Weekly sales
+* Monthly sales
+* Total orders
+* Average order value
+* Best-selling products
+* Cash collection
+* UPI collection
+* Expenses
+* Estimated profit
+
+Need downloadable reports.
+
+---
+
+# 10. Offline & Sync Handling
+
+If internet disconnects:
+
+* Orders should not be lost
+* App should continue functioning temporarily
+* Auto-sync when internet reconnects
+
+---
+
+# 11. User Roles
+
+Need:
+
+## Admin
+
+Can:
+
+* Manage products
+* View reports
+* Manage expenses
+* Access customer database
+
+## Staff
+
+Can:
+
+* Take orders
+* View KOT
+* Update order status
+
+---
+
+# 12. Technical Requirements
+
+Preferred Stack:
+
+* Frontend: React / Next.js
+* Backend: Firebase or Supabase
+* Database: Firebase Firestore or PostgreSQL
+* Authentication: Firebase Auth
+* Real-time sync mandatory
+
+Must support:
+
+* Android phones
+* Tablets
+* Laptops
+* Web browsers
+
+---
+
+# 13. UI/UX Requirements
+
+The application must be:
+
+* Extremely simple
+* Very fast
+* Touch-friendly
+* Minimal clicks
+* Modern UI
+* Dark mode preferred
+* Large buttons
+* Easy for non-technical staff
+
+Priority:
+Speed > Fancy Design
+
+---
+
+# 14. Low Budget Requirement
+
+The system should work using:
+
+* Existing Android phones
+* Existing laptops
+* Shared WiFi or mobile hotspot
+
+Avoid dependency on:
+
+* Thermal printers
+* Expensive POS systems
+* Dedicated hardware
+
+Goal:
+Create a professional low-cost digital KOT ecosystem for a small waffle business.
+
+---
+
+# 15. Future Expansion Features (Optional)
+
+Future scalable features:
+
+* QR menu ordering
+* Online ordering
+* WhatsApp ordering
+* Loyalty points
+* GST billing
+* Inventory management
+* Token display screen
+* Kitchen analytics
+* Multi-branch management
+* Thermal printer support later
+
+---
+
+# Final Objective
+
+Build a real-time digital KOT + billing ecosystem that:
+
+* Speeds up order taking
+* Reduces manual mistakes
+* Eliminates printer dependency
+* Improves kitchen coordination
+* Tracks sales & expenses
+* Builds customer database
+* Helps grow repeat business
+* Runs efficiently with minimal investment
+
+The system should feel lightweight, practical, and production-ready for a real waffle shop environment.
