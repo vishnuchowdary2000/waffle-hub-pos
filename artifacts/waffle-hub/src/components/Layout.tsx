@@ -10,6 +10,7 @@ import {
   UtensilsCrossed,
   Menu,
   X,
+  ShieldCheck,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/menu", label: "Menu", icon: UtensilsCrossed },
+  { href: "/admin", label: "Admin", icon: ShieldCheck },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {

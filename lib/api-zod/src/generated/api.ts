@@ -510,6 +510,11 @@ export const UpdateCustomerResponse = zod.object({
 })
 
 
+export const DeleteCustomerParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
 export const ListExpensesQueryParams = zod.object({
   "period": zod.coerce.string().optional(),
   "date": zod.coerce.string().optional()

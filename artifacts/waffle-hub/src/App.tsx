@@ -11,6 +11,7 @@ import Customers from "@/pages/Customers";
 import Expenses from "@/pages/Expenses";
 import Reports from "@/pages/Reports";
 import MenuManager from "@/pages/MenuManager";
+import Admin from "@/pages/Admin";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,6 +45,7 @@ function Router() {
         <Route path="/expenses" component={Expenses} />
         <Route path="/reports" component={Reports} />
         <Route path="/menu" component={MenuManager} />
+        <Route path="/admin" component={Admin} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

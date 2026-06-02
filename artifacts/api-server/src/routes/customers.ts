@@ -7,9 +7,6 @@ import {
   UpdateCustomerBody,
   GetCustomerParams,
   ListCustomersQueryParams,
-  ListCustomersResponse,
-  GetCustomerResponse,
-  UpdateCustomerResponse,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -64,6 +61,13 @@ router.patch("/customers/:id", async (req, res): Promise<void> => {
   const [row] = await db.update(customersTable).set(parsed.data).where(eq(customersTable.id, params.data.id)).returning();
   if (!row) { res.status(404).json({ error: "Customer not found" }); return; }
   res.json({ ...row, totalSpending: Number(row.totalSpending), lastOrderDate: row.lastOrderDate ? row.lastOrderDate.toISOString() : null, createdAt: row.createdAt.toISOString() });
+});
+
+router.delete("/customers/:id", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  await db.delete(customersTable).where(eq(customersTable.id, id));
+  res.sendStatus(204);
 });
 
 export default router;
