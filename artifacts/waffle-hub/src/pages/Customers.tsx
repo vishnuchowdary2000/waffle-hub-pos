@@ -4,6 +4,8 @@ import {
   useGetCustomer,
   useListOrders,
   getListCustomersQueryKey,
+  getGetCustomerQueryKey,
+  getListOrdersQueryKey,
 } from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Search, User, ChevronRight, X } from "lucide-react";
@@ -19,12 +21,12 @@ export default function Customers() {
   );
 
   const { data: selectedCustomer } = useGetCustomer(selectedId!, {
-    query: { enabled: !!selectedId },
+    query: { enabled: !!selectedId, queryKey: getGetCustomerQueryKey(selectedId ?? 0) },
   });
 
   const { data: customerOrders = [] } = useListOrders(
     { search: selectedCustomer?.phone },
-    { query: { enabled: !!selectedCustomer?.phone } }
+    { query: { enabled: !!selectedCustomer?.phone, queryKey: getListOrdersQueryKey({ search: selectedCustomer?.phone }) } }
   );
 
   return (

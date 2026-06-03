@@ -181,7 +181,7 @@ export default function Expenses() {
             </div>
             <div className="text-right shrink-0">
               <p className="font-bold text-destructive">{formatCurrency(expense.amount)}</p>
-              <p className="text-xs text-muted-foreground">{formatDate(expense.expenseDate)}</p>
+              <p className="text-xs text-muted-foreground">{formatDate(expense.expenseDate ?? "")}</p>
             </div>
             <button
               onClick={() => handleDelete(expense.id)}

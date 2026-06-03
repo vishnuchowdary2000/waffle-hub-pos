@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import {
   Users, Receipt, BarChart3,
   Trash2, Search, AlertTriangle, X,
-  Plus, RefreshCw, Broom,
+  Plus, RefreshCw, Eraser,
   TrendingUp, TrendingDown, ShieldCheck,
 } from "lucide-react";
 

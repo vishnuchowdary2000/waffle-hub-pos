@@ -322,23 +322,8 @@ router.post("/orders/:id/payment", async (req, res): Promise<void> => {
     status,
   }).returning();
 
-  if (status === "paid") {
-    await db.update(ordersTable).set({ status: "completed" }).where(eq(ordersTable.id, params.data.id));
-    // Update customer stats
-    const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, params.data.id));
-    if (order && order.customerId) {
-      const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
-      const itemNames = items.map(i => i.productName).join(", ");
-      await db.execute(sql`
-        UPDATE customers SET
-          order_count = order_count + 1,
-          total_spending = total_spending + ${Number(order.totalAmount)},
-          last_order_date = NOW(),
-          favorite_items = ${itemNames}
-        WHERE id = ${order.customerId}
-      `);
-    }
-  }
+  // Payment is recorded — kitchen status is managed separately by kitchen staff.
+  // Customer stats are updated when kitchen marks the order "completed".
 
   res.status(201).json({
     ...payment,
@@ -376,9 +361,7 @@ router.patch("/orders/:id/payment", async (req, res): Promise<void> => {
     status,
   }).where(eq(paymentsTable.orderId, params.data.id)).returning();
 
-  if (status === "paid") {
-    await db.update(ordersTable).set({ status: "completed" }).where(eq(ordersTable.id, params.data.id));
-  }
+  // Payment update — does not change kitchen status.
 
   res.json({
     ...payment,

@@ -1,9 +1,9 @@
-import { useListOrders, useUpdateOrderStatus, getListOrdersQueryKey } from "@workspace/api-client-react";
+import { useListOrders, useUpdateOrderStatus, getListOrdersQueryKey, type ListOrdersQueryResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatTime, getCountdown, playNotificationSound } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
-import { Clock, RefreshCw, AlertTriangle, X, Trash2 } from "lucide-react";
+import { Clock, RefreshCw, AlertTriangle, X, Trash2, ChevronDown, ChevronUp, ClipboardList } from "lucide-react";
 
 type ConfirmState = { orderId: number; orderNumber: string; customerName: string } | null;
 
@@ -12,6 +12,7 @@ export default function Kitchen() {
   const prevOrderIds = useRef<Set<number>>(new Set());
   const [countdowns, setCountdowns] = useState<Record<number, string>>({});
   const [confirm, setConfirm] = useState<ConfirmState>(null);
+  const [prepOpen, setPrepOpen] = useState(true);
 
   const { data: orders = [], isLoading } = useListOrders(
     { status: "pending,preparing,ready" },
@@ -52,6 +53,23 @@ export default function Kitchen() {
   const preparing = orders.filter(o => o.status === "preparing");
   const ready = orders.filter(o => o.status === "ready");
 
+  // Prep summary: aggregate items from pending + preparing orders by product name + category
+  const prepOrders = orders.filter(o => o.status === "pending" || o.status === "preparing");
+  type PrepItem = { productName: string; category: string; total: number };
+  const prepMap = new Map<string, PrepItem>();
+  for (const order of prepOrders) {
+    for (const item of order.items) {
+      const key = item.productName;
+      const existing = prepMap.get(key);
+      if (existing) {
+        existing.total += item.quantity;
+      } else {
+        prepMap.set(key, { productName: item.productName, category: "", total: item.quantity });
+      }
+    }
+  }
+  const prepItems = Array.from(prepMap.values()).sort((a, b) => b.total - a.total);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full bg-background">
@@ -61,7 +79,8 @@ export default function Kitchen() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 space-y-6">
+    <div className="min-h-screen bg-background p-4 space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Kitchen Display</h1>
@@ -72,6 +91,34 @@ export default function Kitchen() {
           Live
         </div>
       </div>
+
+      {/* ── Prep Summary ── */}
+      {prepItems.length > 0 && (
+        <div className="bg-amber-500/8 border border-amber-500/25 rounded-xl overflow-hidden">
+          <button
+            onClick={() => setPrepOpen(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <ClipboardList size={16} className="text-amber-400" />
+              <span className="font-bold text-sm text-amber-400">
+                Prep List — {prepOrders.length} order{prepOrders.length !== 1 ? "s" : ""} ({pending.length} pending, {preparing.length} preparing)
+              </span>
+            </div>
+            {prepOpen ? <ChevronUp size={15} className="text-amber-400" /> : <ChevronDown size={15} className="text-amber-400" />}
+          </button>
+          {prepOpen && (
+            <div className="px-4 pb-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+              {prepItems.map(item => (
+                <div key={item.productName} className="bg-background/60 border border-amber-500/20 rounded-lg px-3 py-2.5 flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-foreground leading-tight truncate">{item.productName}</span>
+                  <span className="text-xl font-bold text-amber-400 shrink-0">×{item.total}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {orders.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
@@ -147,17 +194,12 @@ export default function Kitchen() {
               </div>
             </div>
             <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => setConfirm(null)}
-                className="flex-1 py-3 rounded-xl bg-secondary text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5"
-              >
+              <button onClick={() => setConfirm(null)}
+                className="flex-1 py-3 rounded-xl bg-secondary text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5">
                 <X size={14} /> Keep Order
               </button>
-              <button
-                onClick={handleCancelConfirmed}
-                disabled={updateStatus.isPending}
-                className="flex-1 py-3 rounded-xl bg-destructive text-white text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5"
-              >
+              <button onClick={handleCancelConfirmed} disabled={updateStatus.isPending}
+                className="flex-1 py-3 rounded-xl bg-destructive text-white text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
                 <Trash2 size={14} /> Cancel Order
               </button>
             </div>
@@ -181,7 +223,7 @@ function Section({ title, count, color, children }: { title: string; count: numb
   );
 }
 
-type OrderType = NonNullable<ReturnType<typeof useListOrders>["data"]>[number];
+type OrderType = ListOrdersQueryResult[number];
 
 function OrderCard({
   order, countdown, statusColor,
@@ -214,7 +256,7 @@ function OrderCard({
         {order.items.map(item => (
           <div key={item.id} className="flex items-start justify-between">
             <span className="text-base font-medium text-foreground">{item.productName}</span>
-            <span className="text-lg font-bold text-primary ml-3 shrink-0">x{item.quantity}</span>
+            <span className="text-lg font-bold text-primary ml-3 shrink-0">×{item.quantity}</span>
           </div>
         ))}
       </div>
@@ -222,6 +264,20 @@ function OrderCard({
       {order.notes && (
         <div className="text-sm text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2 border border-amber-500/20">
           {order.notes}
+        </div>
+      )}
+
+      {/* Payment status badge */}
+      {order.payment && (
+        <div className={cn(
+          "text-xs px-2.5 py-1 rounded-lg font-medium w-fit",
+          order.payment.status === "paid" ? "bg-green-500/15 text-green-400" :
+          order.payment.status === "partial" ? "bg-amber-500/15 text-amber-400" :
+          "bg-secondary text-muted-foreground"
+        )}>
+          {order.payment.status === "paid" ? "✓ Paid" :
+           order.payment.status === "partial" ? `Partial — ₹${order.payment.totalPaid} paid` :
+           "Pay Later"}
         </div>
       )}
 
@@ -242,10 +298,8 @@ function OrderCard({
           </button>
         )}
         {onCancelRequest && (
-          <button
-            onClick={onCancelRequest}
-            className="px-3 py-2.5 bg-secondary hover:bg-destructive/20 text-muted-foreground hover:text-destructive rounded-lg text-sm font-medium transition-colors"
-          >
+          <button onClick={onCancelRequest}
+            className="px-3 py-2.5 bg-secondary hover:bg-destructive/20 text-muted-foreground hover:text-destructive rounded-lg text-sm font-medium transition-colors">
             Cancel
           </button>
         )}
