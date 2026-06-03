@@ -138,6 +138,7 @@ router.post("/orders", async (req, res): Promise<void> => {
       productName: item.productName,
       price: String(item.price),
       quantity: item.quantity,
+      itemOrderType: item.itemOrderType ?? parsed.data.orderType ?? "dine_in",
       notes: item.notes ?? null,
     }));
     await db.insert(orderItemsTable).values(itemsToInsert);
@@ -231,6 +232,7 @@ router.post("/orders/:id/items", async (req, res): Promise<void> => {
     productName: parsed.data.productName,
     price: String(parsed.data.price),
     quantity: parsed.data.quantity,
+    itemOrderType: parsed.data.itemOrderType ?? "dine_in",
     notes: parsed.data.notes ?? null,
   }).returning();
 

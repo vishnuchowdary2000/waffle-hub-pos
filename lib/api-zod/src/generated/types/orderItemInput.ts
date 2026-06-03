@@ -14,5 +14,6 @@ export interface OrderItemInput {
   price: number;
   /** @minimum 1 */
   quantity: number;
+  itemOrderType?: string;
   notes?: string;
 }

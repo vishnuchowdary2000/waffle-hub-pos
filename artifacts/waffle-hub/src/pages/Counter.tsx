@@ -9,19 +9,22 @@ import {
   getGetDashboardQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { formatCurrency, ORDER_TYPE_LABELS } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import {
   Plus, Minus, Trash2, ShoppingCart, Search,
   Banknote, Smartphone, CreditCard, Heart,
-  Clock, CheckCircle, X, ChevronRight,
+  CheckCircle, X, UtensilsCrossed, ShoppingBag,
 } from "lucide-react";
+
+type ItemOrderType = "dine_in" | "takeaway";
 
 type CartItem = {
   productId: number | null;
   productName: string;
   price: number;
   quantity: number;
+  itemOrderType: ItemOrderType;
 };
 
 type PlacedOrder = {
@@ -30,15 +33,15 @@ type PlacedOrder = {
   customerName: string;
   orderType: string;
   totalAmount: number;
-  items: { productName: string; quantity: number; price: number }[];
+  items: { productName: string; quantity: number; price: number; itemOrderType: string }[];
 };
 
 const ORDER_TYPES = ["dine_in", "takeaway", "delivery"] as const;
+const ORDER_TYPE_LABELS: Record<string, string> = { dine_in: "Dine In", takeaway: "Takeaway", delivery: "Delivery" };
 
 export default function Counter() {
   const qc = useQueryClient();
 
-  // Order form state
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [orderType, setOrderType] = useState<"dine_in" | "takeaway" | "delivery">("dine_in");
@@ -46,8 +49,6 @@ export default function Counter() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<number | null>(null);
   const [search, setSearch] = useState("");
-
-  // Post-order payment modal
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
 
   const { data: categories = [] } = useListCategories();
@@ -68,7 +69,8 @@ export default function Counter() {
       if (existing >= 0) {
         return prev.map((c, i) => i === existing ? { ...c, quantity: c.quantity + 1 } : c);
       }
-      return [...prev, { productId: p.id, productName: p.name, price: p.price, quantity: 1 }];
+      const defaultItemType: ItemOrderType = orderType === "delivery" ? "takeaway" : orderType === "takeaway" ? "takeaway" : "dine_in";
+      return [...prev, { productId: p.id, productName: p.name, price: p.price, quantity: 1, itemOrderType: defaultItemType }];
     });
   };
 
@@ -79,6 +81,10 @@ export default function Counter() {
       if (updated[idx].quantity <= 0) updated.splice(idx, 1);
       return updated;
     });
+  };
+
+  const toggleItemType = (idx: number) => {
+    setCart(prev => prev.map((c, i) => i === idx ? { ...c, itemOrderType: c.itemOrderType === "dine_in" ? "takeaway" : "dine_in" } : c));
   };
 
   const removeItem = (idx: number) => setCart(prev => prev.filter((_, i) => i !== idx));
@@ -105,6 +111,7 @@ export default function Counter() {
           productName: c.productName,
           price: c.price,
           quantity: c.quantity,
+          itemOrderType: c.itemOrderType,
         })),
       },
     }, {
@@ -146,9 +153,7 @@ export default function Counter() {
                 "shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                 activeCategory == null ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"
               )}
-            >
-              All
-            </button>
+            >All</button>
             {categories.filter(c => c.active).map(c => (
               <button
                 key={c.id}
@@ -157,9 +162,7 @@ export default function Counter() {
                   "shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                   activeCategory === c.id ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"
                 )}
-              >
-                {c.name}
-              </button>
+              >{c.name}</button>
             ))}
           </div>
         </div>
@@ -215,9 +218,7 @@ export default function Counter() {
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-secondary text-muted-foreground border-transparent hover:border-border"
                 )}
-              >
-                {ORDER_TYPE_LABELS[t]}
-              </button>
+              >{ORDER_TYPE_LABELS[t]}</button>
             ))}
           </div>
           <input
@@ -236,29 +237,46 @@ export default function Counter() {
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {cart.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">Tap menu items to add</p>
           ) : (
             cart.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-2 bg-background rounded-lg px-3 py-2.5 border border-border">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{item.productName}</p>
-                  <p className="text-xs text-muted-foreground">{formatCurrency(item.price)} each</p>
+              <div key={idx} className="bg-background rounded-lg px-3 py-2.5 border border-border space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{item.productName}</p>
+                    <p className="text-xs text-muted-foreground">{formatCurrency(item.price)} each</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => updateQty(idx, -1)} className="w-6 h-6 rounded-md bg-secondary flex items-center justify-center">
+                      <Minus size={10} className="text-foreground" />
+                    </button>
+                    <span className="w-6 text-center text-sm font-bold">{item.quantity}</span>
+                    <button onClick={() => updateQty(idx, 1)} className="w-6 h-6 rounded-md bg-secondary flex items-center justify-center">
+                      <Plus size={10} className="text-foreground" />
+                    </button>
+                    <button onClick={() => removeItem(idx)} className="w-6 h-6 rounded-md text-destructive/60 hover:text-destructive ml-1">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                  <span className="text-sm font-bold text-primary shrink-0">{formatCurrency(item.price * item.quantity)}</span>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => updateQty(idx, -1)} className="w-6 h-6 rounded-md bg-secondary flex items-center justify-center">
-                    <Minus size={10} className="text-foreground" />
-                  </button>
-                  <span className="w-6 text-center text-sm font-bold">{item.quantity}</span>
-                  <button onClick={() => updateQty(idx, 1)} className="w-6 h-6 rounded-md bg-secondary flex items-center justify-center">
-                    <Plus size={10} className="text-foreground" />
-                  </button>
-                  <button onClick={() => removeItem(idx)} className="w-6 h-6 rounded-md text-destructive/60 hover:text-destructive ml-1">
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-                <span className="text-sm font-bold text-primary shrink-0">{formatCurrency(item.price * item.quantity)}</span>
+                {/* Per-item type toggle */}
+                <button
+                  onClick={() => toggleItemType(idx)}
+                  className={cn(
+                    "flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md transition-colors",
+                    item.itemOrderType === "takeaway"
+                      ? "bg-blue-500/15 text-blue-400 border border-blue-500/30"
+                      : "bg-secondary text-muted-foreground border border-transparent hover:border-border"
+                  )}
+                >
+                  {item.itemOrderType === "takeaway"
+                    ? <><ShoppingBag size={10} /> Takeaway</>
+                    : <><UtensilsCrossed size={10} /> Dine In</>
+                  }
+                </button>
               </div>
             ))
           )}
@@ -273,9 +291,18 @@ export default function Counter() {
             className="w-full bg-background border border-input rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">{cart.length} items</span>
+            <span className="text-sm text-muted-foreground">{cart.length} item{cart.length !== 1 ? "s" : ""}</span>
             <span className="text-xl font-bold text-primary">{formatCurrency(total)}</span>
           </div>
+          {/* Takeaway summary */}
+          {cart.some(i => i.itemOrderType === "takeaway") && (
+            <div className="flex items-center gap-1.5 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
+              <ShoppingBag size={12} />
+              <span>
+                {cart.filter(i => i.itemOrderType === "takeaway").reduce((s, i) => s + i.quantity, 0)} item{cart.filter(i => i.itemOrderType === "takeaway").reduce((s, i) => s + i.quantity, 0) !== 1 ? "s" : ""} need packaging
+              </span>
+            </div>
+          )}
           <button
             onClick={placeOrder}
             disabled={!customerName.trim() || cart.length === 0 || createOrder.isPending}
@@ -346,9 +373,7 @@ function PaymentModal({
     });
   };
 
-  const handlePayLater = () => {
-    onClose();
-  };
+  const handlePayLater = () => { onClose(); };
 
   const handleSetFull = (method: "cash" | "upi") => {
     if (method === "cash") { setCash(String(order.totalAmount)); setUpi(""); setCard(""); }
@@ -357,187 +382,118 @@ function PaymentModal({
 
   if (done) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-        <div className="bg-card border border-card-border rounded-2xl p-8 flex flex-col items-center gap-3 shadow-2xl">
-          <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center">
-            <CheckCircle size={32} className="text-green-400" />
-          </div>
-          <p className="text-lg font-bold text-foreground">
-            {isCharity ? "Charity Order ❤️" : "Payment Done!"}
-          </p>
-          <p className="text-sm text-muted-foreground">Order {order.orderNumber}</p>
+      <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
+        <div className="bg-card border border-card-border rounded-2xl p-8 text-center shadow-2xl">
+          <CheckCircle size={48} className={isCharity ? "text-purple-400 mx-auto mb-3" : "text-green-400 mx-auto mb-3"} />
+          <p className="text-xl font-bold text-foreground">{isCharity ? "Charity Order!" : "Order Confirmed!"}</p>
+          <p className="text-muted-foreground text-sm mt-1">{order.orderNumber} sent to Kitchen</p>
         </div>
       </div>
     );
   }
 
+  const takeawayItems = order.items.filter(i => i.itemOrderType === "takeaway");
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-      <div className="bg-card border border-card-border rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="px-5 pt-5 pb-4 border-b border-border flex items-start justify-between shrink-0">
-          <div>
-            <p className="font-mono text-xs text-muted-foreground">{order.orderNumber}</p>
-            <h2 className="text-lg font-bold text-foreground mt-0.5">{order.customerName}</h2>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-medium capitalize">
-                {ORDER_TYPE_LABELS[order.orderType] ?? order.orderType}
-              </span>
-              <span className="text-xs text-muted-foreground">Order placed ✓</span>
-            </div>
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+      <div className="bg-card border border-card-border rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="px-6 pt-6 pb-4 border-b border-border">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-lg font-bold text-foreground">Order {order.orderNumber}</h2>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X size={18} /></button>
           </div>
-          <button onClick={handlePayLater} className="text-muted-foreground hover:text-foreground p-1">
-            <X size={18} />
-          </button>
+          <p className="text-sm text-muted-foreground">{order.customerName}</p>
         </div>
 
-        {/* Order items summary */}
-        <div className="px-5 py-3 bg-secondary/30 border-b border-border shrink-0">
-          <div className="space-y-1">
+        <div className="px-6 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
+          {/* Order summary with item types */}
+          <div className="space-y-1.5">
             {order.items.map((item, i) => (
-              <div key={i} className="flex items-center justify-between text-sm">
-                <span className="text-foreground">{item.productName} <span className="text-muted-foreground">x{item.quantity}</span></span>
-                <span className="font-medium text-foreground">{formatCurrency(item.price * item.quantity)}</span>
+              <div key={i} className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-sm text-foreground truncate">{item.productName} ×{item.quantity}</span>
+                  {item.itemOrderType === "takeaway" && (
+                    <span className="shrink-0 text-xs bg-blue-500/15 text-blue-400 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
+                      <ShoppingBag size={9} /> Pack
+                    </span>
+                  )}
+                </div>
+                <span className="text-sm font-semibold text-primary shrink-0">{formatCurrency(item.price * item.quantity)}</span>
               </div>
             ))}
           </div>
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/60">
-            <span className="font-bold text-sm text-foreground">Total</span>
+
+          {takeawayItems.length > 0 && (
+            <div className="flex items-center gap-2 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
+              <ShoppingBag size={12} />
+              <span>{takeawayItems.reduce((s, i) => s + i.quantity, 0)} items need packing</span>
+            </div>
+          )}
+
+          <div className="border-t border-border pt-3 flex justify-between">
+            <span className="font-semibold text-foreground">Total</span>
             <span className="text-xl font-bold text-primary">{formatCurrency(order.totalAmount)}</span>
           </div>
-        </div>
 
-        {/* Scrollable payment body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {/* Charity toggle */}
           <button
-            onClick={() => setIsCharity(!isCharity)}
+            onClick={() => setIsCharity(v => !v)}
             className={cn(
-              "w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 transition-all",
+              "w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 border transition-colors",
               isCharity
-                ? "bg-pink-500/15 border-pink-500/50 text-pink-400"
-                : "bg-secondary border-transparent text-muted-foreground hover:border-border"
+                ? "bg-purple-500/20 border-purple-500/50 text-purple-400"
+                : "bg-secondary border-border text-muted-foreground hover:text-foreground"
             )}
           >
-            <Heart size={18} className={isCharity ? "fill-pink-400 text-pink-400" : ""} />
-            <div className="text-left flex-1">
-              <p className="font-semibold text-sm">Charity / Free Order</p>
-              <p className="text-xs opacity-70">Mark as given free — no payment needed</p>
-            </div>
-            <div className={cn(
-              "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0",
-              isCharity ? "bg-pink-500 border-pink-500" : "border-muted-foreground"
-            )}>
-              {isCharity && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
-            </div>
+            <Heart size={14} />
+            {isCharity ? "Charity — No Payment Needed" : "Mark as Charity"}
           </button>
 
-          {/* Payment fields — hidden when charity */}
           {!isCharity && (
             <div className="space-y-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Payment Method</p>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Split Payment</p>
+              <div className="space-y-2">
+                <div className="relative">
+                  <Banknote size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input type="number" placeholder="Cash" value={cash} onChange={e => setCash(e.target.value)}
+                    className="w-full bg-background border border-input rounded-lg pl-8 pr-16 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                  <button onClick={() => handleSetFull("cash")} className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-primary font-semibold px-1.5">Full</button>
+                </div>
+                <div className="relative">
+                  <Smartphone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input type="number" placeholder="UPI / QR" value={upi} onChange={e => setUpi(e.target.value)}
+                    className="w-full bg-background border border-input rounded-lg pl-8 pr-16 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                  <button onClick={() => handleSetFull("upi")} className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-primary font-semibold px-1.5">Full</button>
+                </div>
+                <div className="relative">
+                  <CreditCard size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input type="number" placeholder="Card" value={card} onChange={e => setCard(e.target.value)}
+                    className="w-full bg-background border border-input rounded-lg pl-8 pr-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                </div>
+              </div>
 
-              <PayField
-                icon={<Banknote size={16} className="text-emerald-400" />}
-                label="Cash"
-                color="text-emerald-400"
-                value={cash}
-                onChange={setCash}
-                onSetFull={() => handleSetFull("cash")}
-              />
-              <PayField
-                icon={<Smartphone size={16} className="text-blue-400" />}
-                label="UPI / QR"
-                color="text-blue-400"
-                value={upi}
-                onChange={setUpi}
-                onSetFull={() => handleSetFull("upi")}
-              />
-              <PayField
-                icon={<CreditCard size={16} className="text-purple-400" />}
-                label="Card"
-                color="text-purple-400"
-                value={card}
-                onChange={setCard}
-              />
-
-              {(cashAmt + upiAmt + cardAmt) > 0 && (
-                <div className={cn(
-                  "flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold",
-                  balance <= 0 ? "bg-green-500/10 text-green-400" : "bg-amber-500/10 text-amber-400"
-                )}>
-                  <span>{balance <= 0 ? "Change to Return" : "Balance Due"}</span>
-                  <span className="text-lg">{formatCurrency(Math.abs(balance))}</span>
+              {totalPaid > 0 && (
+                <div className={cn("rounded-lg px-3 py-2 text-sm font-semibold flex justify-between",
+                  balance <= 0 ? "bg-green-500/15 text-green-400" : "bg-amber-500/15 text-amber-400")}>
+                  <span>{balance <= 0 ? "✓ Fully Paid" : "Balance Due"}</span>
+                  <span>{balance <= 0 ? formatCurrency(totalPaid) : formatCurrency(balance)}</span>
                 </div>
               )}
             </div>
           )}
-        </div>
 
-        {/* Footer actions */}
-        <div className="px-5 pb-5 pt-3 border-t border-border space-y-2 shrink-0">
-          <button
-            onClick={handlePayNow}
-            disabled={!canPayNow || createPayment.isPending || updateStatus.isPending}
-            className={cn(
-              "w-full py-4 rounded-xl font-bold text-base transition-all flex items-center justify-center gap-2",
-              isCharity
-                ? "bg-pink-600 hover:bg-pink-500 text-white disabled:opacity-50"
-                : "bg-primary hover:opacity-90 text-primary-foreground disabled:opacity-40",
-              "disabled:cursor-not-allowed"
-            )}
-          >
-            {isCharity ? (
-              <><Heart size={18} className="fill-white" /> Mark as Charity</>
-            ) : (
-              <><CheckCircle size={18} /> Pay Now — {formatCurrency(order.totalAmount)}</>
-            )}
-          </button>
-
-          <button
-            onClick={handlePayLater}
-            className="w-full py-3 rounded-xl font-semibold text-sm bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center gap-2 transition-colors"
-          >
-            <Clock size={15} /> Send to Kitchen — Pay Later
-          </button>
+          <div className="flex gap-2 pt-1">
+            <button onClick={handlePayLater}
+              className="flex-1 py-3 rounded-xl bg-secondary text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
+              Send to Kitchen
+            </button>
+            <button onClick={handlePayNow} disabled={!canPayNow || createPayment.isPending}
+              className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 disabled:opacity-40 transition-all">
+              {createPayment.isPending ? "..." : isCharity ? "Confirm Charity" : "Pay & Send"}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function PayField({
-  icon, label, color, value, onChange, onSetFull,
-}: {
-  icon: React.ReactNode; label: string; color: string;
-  value: string; onChange: (v: string) => void; onSetFull?: () => void;
-}) {
-  return (
-    <div className="flex items-center gap-3">
-      <div className={cn("flex items-center gap-2 w-28 shrink-0", color)}>
-        {icon}
-        <span className="text-sm font-medium">{label}</span>
-      </div>
-      <div className="relative flex-1">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
-        <input
-          type="number"
-          min="0"
-          step="1"
-          placeholder="0"
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          className="w-full bg-background border border-input rounded-lg pl-7 pr-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-        />
-      </div>
-      {onSetFull && (
-        <button
-          onClick={onSetFull}
-          className="shrink-0 text-xs px-3 py-2.5 bg-secondary text-muted-foreground hover:text-foreground rounded-lg font-medium"
-        >
-          Full
-        </button>
-      )}
     </div>
   );
 }

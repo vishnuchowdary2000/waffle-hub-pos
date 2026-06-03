@@ -28,6 +28,7 @@ export const orderItemsTable = pgTable("order_items", {
   productName: text("product_name").notNull(),
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
   quantity: integer("quantity").notNull().default(1),
+  itemOrderType: text("item_order_type").notNull().default("dine_in"),
   notes: text("notes"),
 });
 

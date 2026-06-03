@@ -76,6 +76,7 @@ export interface OrderItem {
   productName: string;
   price: number;
   quantity: number;
+  itemOrderType: string;
   /** @nullable */
   notes?: string | null;
 }
@@ -121,6 +122,7 @@ export interface OrderItemInput {
   price: number;
   /** @minimum 1 */
   quantity: number;
+  itemOrderType?: string;
   notes?: string;
 }
 

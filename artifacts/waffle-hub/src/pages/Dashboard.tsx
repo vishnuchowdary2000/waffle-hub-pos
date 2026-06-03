@@ -6,7 +6,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatTime, STATUS_LABELS, ORDER_TYPE_LABELS } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
-import { RefreshCw, TrendingUp, ShoppingBag, Clock, CheckCircle, Search, Trash2, X, AlertTriangle, Plus, Minus } from "lucide-react";
+import {
+  RefreshCw, TrendingUp, ShoppingBag, Clock, CheckCircle,
+  Search, Trash2, X, AlertTriangle, Plus, Minus, Phone,
+} from "lucide-react";
 import { useState } from "react";
 
 const statusClass: Record<string, string> = {
@@ -19,6 +22,27 @@ const statusClass: Record<string, string> = {
 
 type ConfirmState = { orderId: number; orderNumber: string; customerName: string } | null;
 type AddItemsState = { orderId: number; orderNumber: string; customerName: string } | null;
+
+function PaymentBadge({ payment, totalAmount }: {
+  payment: { status: string; totalPaid?: number; balance?: number } | null | undefined;
+  totalAmount: number;
+}) {
+  if (!payment) return (
+    <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-red-500/20 text-red-400 border border-red-500/30 whitespace-nowrap">
+      UNPAID ₹{totalAmount}
+    </span>
+  );
+  if (payment.status === "paid") return (
+    <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-green-500/15 text-green-400 border border-green-500/25 whitespace-nowrap">
+      ✓ PAID
+    </span>
+  );
+  return (
+    <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-amber-500/15 text-amber-400 border border-amber-500/25 whitespace-nowrap">
+      ₹{payment.balance?.toFixed(0)} DUE
+    </span>
+  );
+}
 
 export default function Dashboard() {
   const qc = useQueryClient();
@@ -73,9 +97,9 @@ export default function Dashboard() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Pending"   value={summary?.pendingCount ?? 0}   color="text-amber-400"  bgColor="bg-amber-500/10"  icon={<Clock      size={18} className="text-amber-400" />} />
-        <StatCard label="Preparing" value={summary?.preparingCount ?? 0} color="text-blue-400"   bgColor="bg-blue-500/10"   icon={<ShoppingBag size={18} className="text-blue-400" />} />
-        <StatCard label="Ready"     value={summary?.readyCount ?? 0}     color="text-green-400"  bgColor="bg-green-500/10"  icon={<CheckCircle size={18} className="text-green-400" />} />
+        <StatCard label="Pending"   value={summary?.pendingCount ?? 0}   color="text-amber-400"  bgColor="bg-amber-500/10"   icon={<Clock      size={18} className="text-amber-400" />} />
+        <StatCard label="Preparing" value={summary?.preparingCount ?? 0} color="text-blue-400"   bgColor="bg-blue-500/10"    icon={<ShoppingBag size={18} className="text-blue-400" />} />
+        <StatCard label="Ready"     value={summary?.readyCount ?? 0}     color="text-green-400"  bgColor="bg-green-500/10"   icon={<CheckCircle size={18} className="text-green-400" />} />
         <StatCard label="Done Today" value={summary?.completedToday ?? 0} color="text-emerald-400" bgColor="bg-emerald-500/10" icon={<TrendingUp size={18} className="text-emerald-400" />} />
       </div>
 
@@ -108,48 +132,69 @@ export default function Dashboard() {
           {displayOrders.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">No orders yet today</div>
           )}
-          {displayOrders.slice(0, 15).map(order => (
-            <div key={order.id} className="bg-card border border-card-border rounded-xl px-4 py-3 flex items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono text-xs text-muted-foreground">{order.orderNumber}</span>
-                  <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", statusClass[order.status])}>
-                    {STATUS_LABELS[order.status]}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{ORDER_TYPE_LABELS[order.orderType] ?? order.orderType}</span>
+          {displayOrders.slice(0, 20).map(order => {
+            const isActive = activeStatuses.has(order.status);
+            const isUnpaid = !order.payment;
+            const isPartial = order.payment && order.payment.status === "partial";
+            return (
+              <div key={order.id}
+                className={cn(
+                  "bg-card border border-card-border rounded-xl px-4 py-3 flex items-center gap-3",
+                  isUnpaid && isActive && "border-red-500/30 bg-red-500/5"
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs text-muted-foreground">{order.orderNumber}</span>
+                    <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", statusClass[order.status])}>
+                      {STATUS_LABELS[order.status]}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{ORDER_TYPE_LABELS[order.orderType] ?? order.orderType}</span>
+                    <PaymentBadge payment={order.payment} totalAmount={order.totalAmount} />
+                  </div>
+                  <p className="font-semibold text-sm mt-0.5">{order.customerName}</p>
+                  {order.customerPhone && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <Phone size={10} /> {order.customerPhone}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {order.items.map(i => `${i.productName}${i.itemOrderType === "takeaway" ? " [Pack]" : ""} ×${i.quantity}`).join(", ")}
+                  </p>
                 </div>
-                <p className="font-semibold text-sm mt-0.5">{order.customerName}</p>
-                <p className="text-xs text-muted-foreground">
-                  {order.items.map(i => `${i.productName} ×${i.quantity}`).join(", ")}
-                </p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="font-semibold text-sm text-primary">{formatCurrency(order.totalAmount)}</p>
-                <p className="text-xs text-muted-foreground">{formatTime(order.createdAt)}</p>
-              </div>
-              {activeStatuses.has(order.status) && (
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    onClick={() => setAddItems({ orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName })}
-                    className="p-1.5 rounded-lg bg-secondary hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
-                    title="Add items to order"
-                  >
-                    <Plus size={14} />
-                  </button>
-                  <Link href={`/billing/${order.id}`} className="text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90">
-                    Bill
-                  </Link>
-                  <button
-                    onClick={() => setConfirm({ orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName })}
-                    className="p-1.5 rounded-lg bg-secondary hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
-                    title="Cancel order"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                <div className="text-right shrink-0">
+                  <p className="font-semibold text-sm text-primary">{formatCurrency(order.totalAmount)}</p>
+                  <p className="text-xs text-muted-foreground">{formatTime(order.createdAt)}</p>
                 </div>
-              )}
-            </div>
-          ))}
+                {isActive && (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => setAddItems({ orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName })}
+                      className="p-1.5 rounded-lg bg-secondary hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
+                      title="Add items"
+                    >
+                      <Plus size={14} />
+                    </button>
+                    <Link href={`/billing/${order.id}`}
+                      className={cn(
+                        "text-xs px-3 py-1.5 rounded-lg font-bold hover:opacity-90 transition-all",
+                        isUnpaid || isPartial
+                          ? "bg-red-500 text-white"
+                          : "bg-primary text-primary-foreground"
+                      )}>
+                      {isUnpaid ? "Collect" : isPartial ? "Partial" : "Bill"}
+                    </Link>
+                    <button
+                      onClick={() => setConfirm({ orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName })}
+                      className="p-1.5 rounded-lg bg-secondary hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -166,19 +211,16 @@ export default function Dashboard() {
                 <p className="text-sm text-muted-foreground mt-1">
                   <span className="font-mono text-xs">{confirm.orderNumber}</span> — {confirm.customerName}
                 </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  If this customer has no other orders, their record will also be removed.
-                </p>
               </div>
             </div>
             <div className="flex gap-2 pt-1">
               <button onClick={() => setConfirm(null)}
                 className="flex-1 py-2.5 rounded-xl bg-secondary text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5">
-                <X size={14} /> Keep Order
+                <X size={14} /> Keep
               </button>
               <button onClick={handleCancelConfirmed} disabled={updateStatus.isPending}
                 className="flex-1 py-2.5 rounded-xl bg-destructive text-white text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
-                <Trash2 size={14} /> Cancel Order
+                <Trash2 size={14} /> Cancel
               </button>
             </div>
           </div>
@@ -210,14 +252,13 @@ function AddItemsModal({ orderId, orderNumber, customerName, onClose }: {
   const qc = useQueryClient();
   const [activeCategory, setActiveCategory] = useState<number | null>(null);
   const [search, setSearch] = useState("");
-  const [cart, setCart] = useState<{ productId: number | null; productName: string; price: number; quantity: number }[]>([]);
+  const [cart, setCart] = useState<{ productId: number | null; productName: string; price: number; quantity: number; itemOrderType: "dine_in" | "takeaway" }[]>([]);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
 
   const { data: allProducts = [] } = useListProducts({ active: true });
   const addOrderItem = useAddOrderItem();
 
-  // Build category list from products
   const categoryMap = new Map<number, string>();
   for (const p of allProducts) {
     if (p.categoryId && p.categoryName) categoryMap.set(p.categoryId, p.categoryName);
@@ -234,7 +275,7 @@ function AddItemsModal({ orderId, orderNumber, customerName, onClose }: {
     setCart(prev => {
       const idx = prev.findIndex(c => c.productId === p.id);
       if (idx >= 0) return prev.map((c, i) => i === idx ? { ...c, quantity: c.quantity + 1 } : c);
-      return [...prev, { productId: p.id, productName: p.name, price: p.price, quantity: 1 }];
+      return [...prev, { productId: p.id, productName: p.name, price: p.price, quantity: 1, itemOrderType: "dine_in" }];
     });
   };
 
@@ -254,7 +295,7 @@ function AddItemsModal({ orderId, orderNumber, customerName, onClose }: {
       await new Promise<void>(resolve => {
         addOrderItem.mutate({
           id: orderId,
-          data: { productId: item.productId, productName: item.productName, price: item.price, quantity: item.quantity },
+          data: { productId: item.productId, productName: item.productName, price: item.price, quantity: item.quantity, itemOrderType: item.itemOrderType },
         }, { onSettled: () => resolve() });
       });
     }
@@ -269,7 +310,6 @@ function AddItemsModal({ orderId, orderNumber, customerName, onClose }: {
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
       <div className="bg-card border border-card-border rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
-        {/* Header */}
         <div className="px-5 pt-5 pb-4 border-b border-border flex items-center justify-between shrink-0">
           <div>
             <h2 className="font-bold text-foreground">Add Items to Order</h2>
@@ -281,7 +321,6 @@ function AddItemsModal({ orderId, orderNumber, customerName, onClose }: {
         </div>
 
         <div className="flex flex-1 overflow-hidden min-h-0">
-          {/* Left: product picker */}
           <div className="flex-1 flex flex-col overflow-hidden border-r border-border">
             <div className="p-3 space-y-2 shrink-0">
               <div className="relative">
@@ -324,7 +363,6 @@ function AddItemsModal({ orderId, orderNumber, customerName, onClose }: {
             </div>
           </div>
 
-          {/* Right: selected items */}
           <div className="w-52 flex flex-col overflow-hidden">
             <div className="p-3 border-b border-border shrink-0">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Adding</p>
@@ -363,7 +401,7 @@ function AddItemsModal({ orderId, orderNumber, customerName, onClose }: {
                 className={cn("w-full py-2.5 rounded-xl text-sm font-bold transition-all",
                   done ? "bg-green-600 text-white" :
                   "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed")}>
-                {done ? "✓ Added!" : saving ? "Adding..." : `Add ${cart.length > 0 ? cart.reduce((s, i) => s + i.quantity, 0) + " item" + (cart.reduce((s, i) => s + i.quantity, 0) !== 1 ? "s" : "") : "Items"}`}
+                {done ? "✓ Added!" : saving ? "Adding..." : `Add ${cart.reduce((s, i) => s + i.quantity, 0)} item${cart.reduce((s, i) => s + i.quantity, 0) !== 1 ? "s" : ""}`}
               </button>
             </div>
           </div>

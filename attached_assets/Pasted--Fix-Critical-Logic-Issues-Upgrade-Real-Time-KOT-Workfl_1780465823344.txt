@@ -1,0 +1,487 @@
+# Fix Critical Logic Issues & Upgrade Real-Time KOT Workflow – The Waffle Hub BCM
+
+Please improve and fix the KOT + Billing + Kitchen Management system for “The Waffle Hub BCM”.
+
+The application should behave like a real fast-food production system optimized for:
+
+* High-speed waffle production
+* Real-time kitchen coordination
+* Proper payment handling
+* Batch preparation workflow
+* Low-staff operations
+* Multi-device synchronization
+
+The app should separate:
+
+* Payment Status
+* Order Status
+* Kitchen Preparation Status
+
+These should NEVER be incorrectly linked together.
+
+---
+
+# ISSUE 1 — Payment Logic Bug
+
+## Current Problem
+
+If I send an order to kitchen without collecting payment:
+
+* When kitchen marks order as “Completed”
+* The system automatically marks it as “Paid”
+
+This is WRONG.
+
+Kitchen completion and payment collection are separate processes.
+
+---
+
+# Required Fix
+
+Create separate statuses:
+
+## Payment Status
+
+* Unpaid
+* Partially Paid
+* Paid
+
+## Order Status
+
+* Pending
+* Preparing
+* Ready
+* Completed
+* Delivered
+* Cancelled
+
+Kitchen staff should ONLY control:
+
+* Preparing
+* Ready
+* Completed
+
+Kitchen staff should NEVER change:
+
+* Payment status
+* Billing status
+
+Only counter/admin should control payments.
+
+---
+
+# Counter Payment Workflow
+
+If order is completed but payment is pending:
+
+* Counter dashboard should clearly show:
+
+  * “Payment Pending”
+  * Remaining balance
+  * Unpaid warning indicator
+
+Before final closing:
+
+* Counter staff should collect payment
+
+Only counter/admin can mark:
+
+* Paid
+* Partially Paid
+* Credit Order
+
+---
+
+# Split Payment Support
+
+Need support for:
+
+* Cash
+* UPI / QR
+* Mixed payment
+
+Example:
+
+* ₹200 Cash
+* ₹300 UPI
+
+System should properly calculate:
+
+* Paid amount
+* Remaining balance
+* Pending amount
+* Payment status
+
+---
+
+# ISSUE 2 — Payment Completion Indicator Bug
+
+## Current Problem
+
+Even after bill is fully paid:
+
+* Dashboard still shows payment/bill icon again
+* It does not clearly show payment completed status
+
+This creates confusion for staff.
+
+---
+
+# Required Fix
+
+If payment is fully completed:
+Show:
+
+* “PAID”
+* “BILL COMPLETED”
+* Green payment badge/icon
+
+Do NOT show:
+
+* Payment pending icon
+* Collection reminder
+* Bill icon again
+
+---
+
+# Payment Status UI Requirements
+
+## Fully Paid
+
+Show:
+
+* Green badge
+* “Paid”
+* “Bill Completed”
+
+## Partially Paid
+
+Show:
+
+* Orange badge
+* Remaining balance
+
+## Unpaid
+
+Show:
+
+* Red badge
+* Full pending amount
+
+Need real-time sync across:
+
+* Counter dashboard
+* Kitchen dashboard
+* Order summary
+* Reports
+
+---
+
+# ISSUE 3 — Mixed Dine-In + Takeaway Orders
+
+## Current Problem
+
+If customer says:
+
+* One item dine-in
+* One item takeaway
+
+The app does not support mixed order handling properly.
+
+---
+
+# Required Fix
+
+Each individual item inside an order should support:
+
+* Dine In
+* Takeaway
+* Delivery
+
+NOT only order-level type.
+
+Example:
+
+Order #101
+
+* Belgian Waffle → Dine In
+* Pocket Waffle → Takeaway
+
+Need:
+
+* Separate takeaway indicators
+* Packaging reminder
+* Proper kitchen visibility
+
+---
+
+# Takeaway Workflow Requirements
+
+Counter dashboard should clearly show:
+
+* Which items are takeaway
+* Which items are dine-in
+
+Need:
+
+* Takeaway badge
+* Packing reminder
+* Separate packaging workflow
+
+---
+
+# ISSUE 4 — Kitchen Workflow Must Be Category-Based Instead of Customer-Based
+
+## Current Problem
+
+Kitchen screen currently shows:
+
+* Full customer orders individually
+
+This slows production during rush hours.
+
+---
+
+# Required Kitchen Workflow Change
+
+Instead of showing:
+
+* Customer-wise order list
+
+Show:
+
+* Category-wise production queue
+
+Example:
+
+## Biscuits Waffle
+
+Pending: 12
+
+## Pocket Waffle
+
+Pending: 7
+
+## Brownie Waffle
+
+Pending: 5
+
+Totals should accumulate automatically from all active orders.
+
+---
+
+# Smart Batch Production Counter System
+
+Kitchen staff should be able to:
+
+* Reduce pending counts while preparing batches
+
+Example:
+
+* Pocket Waffle Pending = 10
+* Prepared batter for 4
+* Remaining pending = 6
+
+If extra batter prepared:
+
+* Count should become negative
+
+Example:
+
+* Pending = 2
+* Prepared = 5
+* Remaining = -3
+
+Negative values mean:
+
+* Extra prepared stock available
+
+---
+
+# Dynamic Auto Adjustment Logic
+
+If new orders come:
+
+* Existing negative stock should reduce first
+
+Example:
+
+Current:
+Pocket Waffle = -3
+
+New 2 orders:
+Pocket Waffle = -1
+
+New 5 orders:
+Pocket Waffle = +4
+
+This is VERY IMPORTANT because waffle preparation happens in batches.
+
+---
+
+# Kitchen Dashboard Requirements
+
+Kitchen dashboard should display:
+
+## Category Cards
+
+Each card should show:
+
+* Product Category Name
+* Total Pending Count
+* Preparing Count
+* Extra Prepared Stock (negative values)
+* Quick +/- controls
+
+Need:
+
+* Very large numbers
+* One-touch controls
+* Dark mode
+* Touch-friendly UI
+* Real-time updates
+
+---
+
+# Batch Preparation Controls
+
+Kitchen staff should be able to:
+
+* Add prepared quantity
+* Reduce prepared quantity
+* Reset category counts
+* Mark batch completed
+
+Need extremely fast workflow because kitchen is busy.
+
+---
+
+# ISSUE 5 — Customer Mobile Number Visibility
+
+## Current Problem
+
+Even if customer mobile number is collected:
+
+* It is not clearly visible everywhere in system
+
+This creates problems in:
+
+* Calling customers
+* Delivery coordination
+* Identifying repeat customers
+* Managing takeaway orders
+
+---
+
+# Required Fix
+
+If customer mobile number exists:
+
+* Show it everywhere related to the order
+
+Need mobile number visible in:
+
+* KOT
+* Counter dashboard
+* Kitchen dashboard
+* Order details popup
+* Completed orders
+* Search results
+* Customer history
+
+Format example:
+
+Rahul Kumar
++91 9876543210
+
+Mobile number should appear directly below customer name.
+
+---
+
+# Additional Customer Features
+
+Need:
+
+* Click-to-call customer
+* Search using mobile number
+* Automatic repeat customer detection
+
+If same mobile number already exists:
+Show:
+
+* “Repeat Customer”
+* Previous order count
+* Last order date
+
+---
+
+# Unpaid Order Alerts
+
+Counter dashboard should:
+
+* Highlight unpaid orders in red
+* Show pending amount clearly
+* Prevent accidental closing without payment
+
+---
+
+# Real-Time Sync Requirements
+
+Need instant synchronization across:
+
+* Counter device
+* Kitchen device
+* Reports dashboard
+* Order tracking
+
+No manual refresh should be required.
+
+Recommended:
+
+* Supabase Realtime
+  OR
+* Firebase Realtime Database
+
+---
+
+# Offline Handling
+
+If internet disconnects temporarily:
+
+* Orders should not be lost
+* Changes should sync automatically after reconnect
+
+---
+
+# UI / UX Requirements
+
+System should be:
+
+* Extremely fast
+* Minimal-click workflow
+* Touch-friendly
+* Mobile + laptop compatible
+* Dark mode preferred
+* Large readable text
+* Optimized for rush-hour operations
+
+Priority:
+Speed and operational efficiency over fancy design.
+
+---
+
+# Final Objective
+
+Transform the current app into a real production-oriented waffle shop operating system that:
+
+* Handles payments correctly
+* Supports mixed dine-in/takeaway workflows
+* Optimizes kitchen batch production
+* Tracks pending food preparation efficiently
+* Eliminates billing confusion
+* Improves customer tracking
+* Supports repeat customers
+* Runs smoothly on low-cost devices
+* Works efficiently without printers or expensive POS hardware
+
+The app should feel practical, ultra-fast, and reliable for real-world waffle shop operations.

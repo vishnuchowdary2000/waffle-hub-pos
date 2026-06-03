@@ -14,6 +14,7 @@ export interface OrderItem {
   productName: string;
   price: number;
   quantity: number;
+  itemOrderType: string;
   /** @nullable */
   notes?: string | null;
 }

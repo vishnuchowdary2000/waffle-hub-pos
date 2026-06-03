@@ -167,6 +167,7 @@ export const ListOrdersResponseItem = zod.object({
   "productName": zod.string(),
   "price": zod.number(),
   "quantity": zod.number(),
+  "itemOrderType": zod.string(),
   "notes": zod.string().nullish()
 })),
   "payment": zod.object({
@@ -201,6 +202,7 @@ export const CreateOrderBody = zod.object({
   "productName": zod.string().min(1),
   "price": zod.number(),
   "quantity": zod.number().min(1),
+  "itemOrderType": zod.string().optional(),
   "notes": zod.string().optional()
 })).optional()
 })
@@ -230,6 +232,7 @@ export const GetOrderResponse = zod.object({
   "productName": zod.string(),
   "price": zod.number(),
   "quantity": zod.number(),
+  "itemOrderType": zod.string(),
   "notes": zod.string().nullish()
 })),
   "payment": zod.object({
@@ -278,6 +281,7 @@ export const UpdateOrderResponse = zod.object({
   "productName": zod.string(),
   "price": zod.number(),
   "quantity": zod.number(),
+  "itemOrderType": zod.string(),
   "notes": zod.string().nullish()
 })),
   "payment": zod.object({
@@ -328,6 +332,7 @@ export const UpdateOrderStatusResponse = zod.object({
   "productName": zod.string(),
   "price": zod.number(),
   "quantity": zod.number(),
+  "itemOrderType": zod.string(),
   "notes": zod.string().nullish()
 })),
   "payment": zod.object({
@@ -358,6 +363,7 @@ export const AddOrderItemBody = zod.object({
   "productName": zod.string().min(1),
   "price": zod.number(),
   "quantity": zod.number().min(1),
+  "itemOrderType": zod.string().optional(),
   "notes": zod.string().optional()
 })
 
@@ -382,6 +388,7 @@ export const UpdateOrderItemResponse = zod.object({
   "productName": zod.string(),
   "price": zod.number(),
   "quantity": zod.number(),
+  "itemOrderType": zod.string(),
   "notes": zod.string().nullish()
 })
 
@@ -606,6 +613,7 @@ export const GetDashboardResponse = zod.object({
   "productName": zod.string(),
   "price": zod.number(),
   "quantity": zod.number(),
+  "itemOrderType": zod.string(),
   "notes": zod.string().nullish()
 })),
   "payment": zod.object({

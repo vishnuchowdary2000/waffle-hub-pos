@@ -767,25 +767,27 @@ components:
     # ── Order Item ────────────────────────────────────────────────────────────
     OrderItem:
       type: object
-      required: [id, orderId, productName, price, quantity]
+      required: [id, orderId, productName, price, quantity, itemOrderType]
       properties:
-        id:          { type: integer }
-        orderId:     { type: integer }
-        productId:   { type: ["integer", "null"] }
-        productName: { type: string }
-        price:       { type: number }
-        quantity:    { type: integer }
-        notes:       { type: ["string", "null"] }
+        id:            { type: integer }
+        orderId:       { type: integer }
+        productId:     { type: ["integer", "null"] }
+        productName:   { type: string }
+        price:         { type: number }
+        quantity:      { type: integer }
+        itemOrderType: { type: string }
+        notes:         { type: ["string", "null"] }
 
     OrderItemInput:
       type: object
       required: [productName, price, quantity]
       properties:
-        productId:   { type: ["integer", "null"] }
-        productName: { type: string, minLength: 1 }
-        price:       { type: number }
-        quantity:    { type: integer, minimum: 1 }
-        notes:       { type: string }
+        productId:     { type: ["integer", "null"] }
+        productName:   { type: string, minLength: 1 }
+        price:         { type: number }
+        quantity:      { type: integer, minimum: 1 }
+        itemOrderType: { type: string }
+        notes:         { type: string }
 
     OrderItemUpdate:
       type: object

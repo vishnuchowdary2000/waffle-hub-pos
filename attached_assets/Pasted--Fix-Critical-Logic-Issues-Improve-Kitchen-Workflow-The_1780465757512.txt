@@ -1,0 +1,333 @@
+# Fix Critical Logic Issues & Improve Kitchen Workflow – The Waffle Hub BCM
+
+Please fix the following critical workflow problems and improve the kitchen operation logic in the KOT system.
+
+The app should behave like a real fast-food production system and should separate:
+
+* Payment Status
+* Order Status
+* Kitchen Preparation Status
+
+These should NEVER be automatically linked incorrectly.
+
+---
+
+# ISSUE 1 — Payment Logic Bug
+
+## Current Problem
+
+If I send order to kitchen without collecting payment:
+
+* When kitchen marks order as “Completed”
+* The system automatically marks it as “Paid”
+
+This is WRONG.
+
+Order completion and payment completion are separate things.
+
+---
+
+# Required Fix
+
+Create separate statuses:
+
+## Payment Status
+
+* Unpaid
+* Partially Paid
+* Paid
+
+## Order Status
+
+* Pending
+* Preparing
+* Ready
+* Completed
+* Delivered
+* Cancelled
+
+Kitchen staff should ONLY control:
+
+* Preparing
+* Ready
+* Completed
+
+Kitchen should NEVER change payment status.
+
+---
+
+# Counter Payment Workflow
+
+If order is completed but unpaid:
+
+* Counter dashboard should show:
+
+  * “Payment Pending”
+  * Highlight unpaid orders clearly
+
+Before closing the order:
+
+* Counter staff should collect payment
+
+Only counter/admin can mark:
+
+* Paid
+* Partially Paid
+
+---
+
+# Split Payment Support
+
+Need support for:
+
+* Cash
+* UPI
+* Mixed payment
+
+Example:
+
+* ₹200 Cash
+* ₹300 UPI
+
+System should properly calculate:
+
+* Remaining balance
+* Paid amount
+* Pending amount
+
+---
+
+# ISSUE 2 — Mixed Dine-In + Takeaway Orders
+
+## Current Problem
+
+If customer says:
+
+* One item dine-in
+* One item takeaway
+
+The app does not handle it properly.
+
+---
+
+# Required Fix
+
+Each individual item in an order should support:
+
+* Dine In
+* Takeaway
+* Delivery
+
+NOT only entire order level.
+
+Example:
+
+Order #101
+
+* Belgian Waffle → Dine In
+* Pocket Waffle → Takeaway
+
+Counter dashboard should clearly display:
+
+* Separate takeaway items
+* Separate dine-in items
+
+Need:
+
+* Visual takeaway indicator
+* Packaging reminder for takeaway items
+
+---
+
+# ISSUE 3 — Kitchen Workflow Must Be Category-Based Instead of Order-Based
+
+## Current Problem
+
+Kitchen screen currently shows complete customer orders individually.
+
+This slows production.
+
+I want kitchen workflow optimized for batch preparation.
+
+---
+
+# Required Kitchen Logic Change
+
+Instead of showing:
+Customer-wise orders
+
+Show:
+Category-wise production queue.
+
+Example:
+
+## Biscuits Waffle
+
+* Total Pending: 12
+
+## Pocket Waffle
+
+* Total Pending: 7
+
+## Brownie Waffle
+
+* Total Pending: 5
+
+These totals should accumulate automatically from all active customer orders.
+
+---
+
+# Smart Production Counter System
+
+Kitchen staff should be able to:
+
+* Reduce pending count manually while preparing batches
+
+Example:
+
+* Pocket Waffle Pending = 10
+* I prepare batter for 4
+* Remaining pending should become:
+
+  * 6
+
+If I accidentally prepare extra:
+
+* Count can become negative
+
+Example:
+
+* Pending = 2
+* Prepared = 5
+* Remaining = -3
+
+Negative means:
+
+* Extra prepared stock available
+
+---
+
+# Dynamic Auto Adjustment Logic
+
+If new order comes:
+
+* Existing negative stock should reduce first
+
+Example:
+Current:
+
+* Pocket Waffle = -3
+
+New 2 orders arrive:
+
+* Count becomes:
+
+  * -1
+
+New 5 orders arrive:
+
+* Count becomes:
+
+  * +4
+
+This is VERY IMPORTANT because kitchen works in batch production.
+
+---
+
+# Kitchen Dashboard Requirements
+
+Kitchen dashboard should show:
+
+## Category Cards
+
+Each card should display:
+
+* Product Category Name
+* Total Pending Count
+* Preparing Count
+* Extra Prepared Count (negative values)
+* Quick +/- buttons
+
+Need:
+
+* Very large numbers
+* One-touch controls
+* Dark mode
+* Real-time sync
+
+---
+
+# Batch Preparation Controls
+
+Kitchen staff should be able to:
+
+* Add prepared quantity
+* Reduce prepared quantity
+* Reset category count
+* Mark batch completed
+
+Need ultra-fast controls because kitchen is busy.
+
+---
+
+# Real-Time Sync Requirements
+
+Changes made in kitchen should instantly reflect on:
+
+* Counter dashboard
+* Reports
+* Active order tracking
+
+Need:
+
+* Real-time synchronization
+* No manual refresh
+
+Recommended:
+
+* Supabase Realtime
+  OR
+* Firebase Realtime
+
+---
+
+# Additional Required Improvements
+
+## Unpaid Order Alert
+
+Counter dashboard should:
+
+* Highlight unpaid orders in red
+* Show unpaid amount clearly
+
+---
+
+## Takeaway Packaging Alert
+
+If takeaway items exist:
+
+* Show takeaway badge
+* Show packing reminder
+
+---
+
+## Order Completion Rules
+
+Order should NOT move to fully completed sales record unless:
+
+* Payment collected
+  OR
+* Marked intentionally as credit/unpaid by admin
+
+---
+
+# Final Objective
+
+Transform the app from a simple KOT viewer into a real production-oriented waffle shop operating system optimized for:
+
+* Fast batch preparation
+* Real-time kitchen coordination
+* Proper payment tracking
+* Mixed order handling
+* High-speed food counter operations
+* Low-staff workflow efficiency
