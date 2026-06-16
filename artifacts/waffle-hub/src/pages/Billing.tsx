@@ -14,7 +14,16 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatTime, STATUS_LABELS, ORDER_TYPE_LABELS } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, CheckCircle, Banknote, Smartphone, CreditCard } from "lucide-react";
+import { ArrowLeft, CheckCircle, Banknote, Smartphone, CreditCard, Phone } from "lucide-react";
+
+const statusClass: Record<string, string> = {
+  pending_payment: "status-pending_payment",
+  approved:   "status-approved",
+  preparing:  "status-preparing",
+  ready:      "status-ready",
+  completed:  "status-completed",
+  cancelled:  "status-cancelled",
+};
 
 export default function Billing() {
   const [, params] = useRoute("/billing/:id");
@@ -62,31 +71,38 @@ export default function Billing() {
   const balance = totalAmount - totalPaid;
   const isPaid = balance <= 0;
 
+  // Previously paid (from existing payment record)
+  const alreadyPaid = existingPayment ? existingPayment.totalPaid : 0;
+  const pending = totalAmount - alreadyPaid;
+
   const handleSetFullCash = () => { setCash(String(totalAmount)); setUpi("0"); setCard("0"); };
   const handleSetFullUpi = () => { setUpi(String(totalAmount)); setCash("0"); setCard("0"); };
 
   const handleSave = () => {
-    const payload = {
-      totalAmount,
-      cashAmount: cashAmt,
-      upiAmount: upiAmt,
-      cardAmount: cardAmt,
+    const afterSave = () => {
+      qc.invalidateQueries({ queryKey: getGetOrderQueryKey(orderId) });
+      qc.invalidateQueries({ queryKey: getGetOrderPaymentQueryKey(orderId) });
+      qc.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+      qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+      if (isPaid) navigate("/dashboard");
     };
+
     if (existingPayment) {
       updatePayment.mutate({ id: orderId, data: { cashAmount: cashAmt, upiAmount: upiAmt, cardAmount: cardAmt } }, {
         onSuccess: () => {
-          qc.invalidateQueries({ queryKey: getGetOrderQueryKey(orderId) });
-          qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
-          if (isPaid) navigate("/dashboard");
+          // Auto-approve if still pending_payment
+          if (order.status === "pending_payment") {
+            updateStatus.mutate({ id: orderId, data: { status: "approved" } }, { onSuccess: afterSave });
+          } else {
+            afterSave();
+          }
         },
       });
     } else {
-      createPayment.mutate({ id: orderId, data: payload }, {
+      createPayment.mutate({ id: orderId, data: { totalAmount, cashAmount: cashAmt, upiAmount: upiAmt, cardAmount: cardAmt } }, {
         onSuccess: () => {
-          qc.invalidateQueries({ queryKey: getGetOrderQueryKey(orderId) });
-          qc.invalidateQueries({ queryKey: getListOrdersQueryKey() });
-          qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
-          if (isPaid) navigate("/dashboard");
+          // Backend auto-approves; just refresh
+          afterSave();
         },
       });
     }
@@ -94,11 +110,8 @@ export default function Billing() {
 
   return (
     <div className="max-w-2xl mx-auto p-4 md:p-6 space-y-5">
-      {/* Back */}
-      <button
-        onClick={() => navigate("/dashboard")}
-        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-      >
+      <button onClick={() => navigate("/dashboard")}
+        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft size={16} /> Back to Dashboard
       </button>
 
@@ -106,13 +119,17 @@ export default function Billing() {
       <div className="bg-card border border-card-border rounded-xl p-5">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <p className="font-mono text-xs text-muted-foreground">{order.orderNumber}</p>
-            <h1 className="text-xl font-bold text-foreground">{order.customerName}</h1>
-            {order.customerPhone && <p className="text-sm text-muted-foreground">{order.customerPhone}</p>}
+            <p className="font-mono text-sm font-bold text-primary">{order.orderNumber}</p>
+            <h1 className="text-xl font-bold text-foreground mt-0.5">{order.customerName}</h1>
+            {order.customerPhone && (
+              <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                <Phone size={13} /> {order.customerPhone}
+              </p>
+            )}
           </div>
           <div className="text-right">
-            <span className={cn("text-xs px-2 py-1 rounded-full font-medium", `status-${order.status}`)}>
-              {STATUS_LABELS[order.status]}
+            <span className={cn("text-xs px-2 py-1 rounded-full font-medium", statusClass[order.status])}>
+              {STATUS_LABELS[order.status] ?? order.status}
             </span>
             <p className="text-xs text-muted-foreground mt-1">{ORDER_TYPE_LABELS[order.orderType] ?? order.orderType}</p>
             <p className="text-xs text-muted-foreground">{formatTime(order.createdAt)}</p>
@@ -123,27 +140,47 @@ export default function Billing() {
         <div className="space-y-2 border-t border-border pt-4">
           {order.items.map(item => (
             <div key={item.id} className="flex items-center justify-between">
-              <div>
+              <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-foreground">{item.productName}</span>
+                {item.itemOrderType === "takeaway" && (
+                  <span className="text-xs bg-blue-500/15 text-blue-400 px-1.5 py-0.5 rounded">Pack</span>
+                )}
                 {item.notes && <p className="text-xs text-muted-foreground">{item.notes}</p>}
               </div>
-              <div className="text-right">
-                <span className="text-sm text-muted-foreground">x{item.quantity}</span>
-                <span className="text-sm font-semibold text-foreground ml-3">{formatCurrency(item.price * item.quantity)}</span>
+              <div className="text-right flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">×{item.quantity}</span>
+                <span className="text-sm font-semibold text-foreground">{formatCurrency(item.price * item.quantity)}</span>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="border-t border-border mt-4 pt-3 flex justify-between items-center">
-          <span className="text-base font-bold text-foreground">Total</span>
-          <span className="text-2xl font-bold text-primary">{formatCurrency(totalAmount)}</span>
+        {/* Totals summary box */}
+        <div className="mt-4 border-t border-border pt-4 bg-secondary/40 rounded-xl p-4 space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Total Amount</span>
+            <span className="font-bold text-foreground">{formatCurrency(totalAmount)}</span>
+          </div>
+          {alreadyPaid > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Amount Paid</span>
+              <span className="font-semibold text-green-400">{formatCurrency(alreadyPaid)}</span>
+            </div>
+          )}
+          <div className="flex justify-between text-base font-bold border-t border-border/50 pt-2">
+            <span className={pending <= 0 ? "text-green-400" : "text-amber-400"}>
+              {pending <= 0 ? "Fully Paid ✓" : "Pending Amount"}
+            </span>
+            <span className={pending <= 0 ? "text-green-400" : "text-amber-400"}>
+              {pending <= 0 ? formatCurrency(totalAmount) : formatCurrency(pending)}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Payment entry */}
       <div className="bg-card border border-card-border rounded-xl p-5 space-y-4">
-        <h2 className="text-base font-bold text-foreground">Payment</h2>
+        <h2 className="text-base font-bold text-foreground">Collect Payment</h2>
 
         <PaymentField
           icon={<Banknote size={16} className="text-emerald-400" />}
@@ -169,21 +206,21 @@ export default function Billing() {
           color="text-purple-400"
         />
 
-        {/* Summary */}
-        <div className="border-t border-border pt-4 space-y-2">
+        {/* Live payment summary */}
+        <div className="border-t border-border pt-4 bg-secondary/40 rounded-xl p-4 space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Total Amount</span>
             <span className="font-semibold">{formatCurrency(totalAmount)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Amount Paid</span>
-            <span className="font-semibold text-emerald-400">{formatCurrency(totalPaid)}</span>
+            <span className="font-semibold text-green-400">{formatCurrency(totalPaid)}</span>
           </div>
-          <div className="flex justify-between text-base font-bold">
-            <span className={balance > 0 ? "text-amber-400" : "text-green-400"}>
-              {balance > 0 ? "Balance Due" : "Change"}
+          <div className="flex justify-between text-base font-bold border-t border-border/50 pt-2">
+            <span className={balance <= 0 ? "text-green-400" : "text-amber-400"}>
+              {balance <= 0 ? "Change / Fully Paid" : "Pending Amount"}
             </span>
-            <span className={balance > 0 ? "text-amber-400" : "text-green-400"}>
+            <span className={balance <= 0 ? "text-green-400" : "text-amber-400"}>
               {formatCurrency(Math.abs(balance))}
             </span>
           </div>
@@ -202,9 +239,9 @@ export default function Billing() {
         >
           {isPaid ? (
             <span className="flex items-center justify-center gap-2">
-              <CheckCircle size={18} /> Mark as Paid
+              <CheckCircle size={18} /> Mark as Fully Paid
             </span>
-          ) : "Save Payment"}
+          ) : "Save Partial Payment"}
         </button>
       </div>
     </div>
@@ -226,11 +263,7 @@ function PaymentField({
       <div className="flex-1 relative">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
         <input
-          type="number"
-          min="0"
-          step="1"
-          value={value}
-          onChange={e => onChange(e.target.value)}
+          type="number" min="0" step="1" value={value} onChange={e => onChange(e.target.value)}
           className="w-full bg-background border border-input rounded-lg pl-7 pr-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         />
       </div>

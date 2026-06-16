@@ -10,4 +10,5 @@ export type ListOrdersParams = {
 status?: string;
 search?: string;
 date?: string;
+customerId?: number;
 };

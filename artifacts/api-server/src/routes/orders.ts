@@ -24,12 +24,6 @@ import {
 
 const router: IRouter = Router();
 
-function generateOrderNumber(): string {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `WH${now.getFullYear().toString().slice(-2)}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${Math.floor(1000 + Math.random() * 9000)}`;
-}
-
 async function getFullOrder(id: number) {
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, id));
   if (!order) return null;
@@ -84,11 +78,14 @@ router.get("/orders", async (req, res): Promise<void> => {
       conditions.push(gte(ordersTable.createdAt, start));
       conditions.push(lte(ordersTable.createdAt, end));
     }
+    if (q.data.customerId) {
+      conditions.push(eq(ordersTable.customerId, q.data.customerId));
+    }
   }
 
   const orders = await db.select().from(ordersTable)
     .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(ordersTable.createdAt);
+    .orderBy(sql`${ordersTable.createdAt} DESC`);
 
   const result = await Promise.all(orders.map(o => getFullOrder(o.id)));
   res.json(result.filter(Boolean));
@@ -100,8 +97,6 @@ router.post("/orders", async (req, res): Promise<void> => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
   const readyTime = new Date(Date.now() + 10 * 60 * 1000);
-  const orderNumber = generateOrderNumber();
-
   let customerId = parsed.data.customerId ?? null;
 
   // Auto-create or find customer by phone
@@ -118,16 +113,22 @@ router.post("/orders", async (req, res): Promise<void> => {
     }
   }
 
+  // Insert with temp order number; update to sequential ORD-XXXX after getting id
   const [order] = await db.insert(ordersTable).values({
-    orderNumber,
+    orderNumber: `TMP-${Date.now()}`,
     customerId,
     customerName: parsed.data.customerName,
     customerPhone: parsed.data.customerPhone ?? null,
     orderType: parsed.data.orderType,
+    status: "pending_payment",
     notes: parsed.data.notes ?? null,
     totalAmount: "0",
     readyTime,
   }).returning();
+
+  // Sequential order number: ORD-0001, ORD-0002...
+  const orderNumber = `ORD-${String(order.id).padStart(4, "0")}`;
+  await db.update(ordersTable).set({ orderNumber }).where(eq(ordersTable.id, order.id));
 
   // Insert items
   let total = 0;
@@ -302,7 +303,7 @@ router.get("/orders/:id/payment", async (req, res): Promise<void> => {
   });
 });
 
-// Create payment
+// Create payment — auto-approves order if pending_payment
 router.post("/orders/:id/payment", async (req, res): Promise<void> => {
   const params = CreateOrderPaymentParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
@@ -324,8 +325,11 @@ router.post("/orders/:id/payment", async (req, res): Promise<void> => {
     status,
   }).returning();
 
-  // Payment is recorded — kitchen status is managed separately by kitchen staff.
-  // Customer stats are updated when kitchen marks the order "completed".
+  // Auto-approve order if still in pending_payment state
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, params.data.id));
+  if (order && order.status === "pending_payment") {
+    await db.update(ordersTable).set({ status: "approved" }).where(eq(ordersTable.id, params.data.id));
+  }
 
   res.status(201).json({
     ...payment,
@@ -339,7 +343,7 @@ router.post("/orders/:id/payment", async (req, res): Promise<void> => {
   });
 });
 
-// Update payment
+// Update payment — auto-approves order if pending_payment
 router.patch("/orders/:id/payment", async (req, res): Promise<void> => {
   const params = UpdateOrderPaymentParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
@@ -363,7 +367,11 @@ router.patch("/orders/:id/payment", async (req, res): Promise<void> => {
     status,
   }).where(eq(paymentsTable.orderId, params.data.id)).returning();
 
-  // Payment update — does not change kitchen status.
+  // Auto-approve order if still in pending_payment state
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, params.data.id));
+  if (order && order.status === "pending_payment") {
+    await db.update(ordersTable).set({ status: "approved" }).where(eq(ordersTable.id, params.data.id));
+  }
 
   res.json({
     ...payment,

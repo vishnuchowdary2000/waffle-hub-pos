@@ -196,6 +196,10 @@ paths:
           in: query
           schema:
             type: string
+        - name: customerId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: OK
@@ -889,9 +893,10 @@ components:
     # ── Dashboard ─────────────────────────────────────────────────────────────
     DashboardSummary:
       type: object
-      required: [pendingCount, preparingCount, readyCount, completedToday, cancelledToday, todayRevenue, todayOrders, todayExpenses]
+      required: [pendingCount, approvedCount, preparingCount, readyCount, completedToday, cancelledToday, todayRevenue, todayOrders, todayExpenses]
       properties:
         pendingCount:    { type: integer }
+        approvedCount:   { type: integer }
         preparingCount:  { type: integer }
         readyCount:      { type: integer }
         completedToday:  { type: integer }

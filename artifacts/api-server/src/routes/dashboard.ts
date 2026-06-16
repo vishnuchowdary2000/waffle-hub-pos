@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, gte, lte, and, sql } from "drizzle-orm";
+import { eq, gte, lte, and, or, sql } from "drizzle-orm";
 import { db, ordersTable, orderItemsTable, paymentsTable, expensesTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -10,14 +10,16 @@ router.get("/dashboard", async (req, res): Promise<void> => {
   const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
   const [
-    pendingOrders,
+    pendingPaymentOrders,
+    approvedOrders,
     preparingOrders,
     readyOrders,
     completedToday,
     cancelledToday,
     recentOrders,
   ] = await Promise.all([
-    db.select().from(ordersTable).where(eq(ordersTable.status, "pending")),
+    db.select().from(ordersTable).where(eq(ordersTable.status, "pending_payment")),
+    db.select().from(ordersTable).where(eq(ordersTable.status, "approved")),
     db.select().from(ordersTable).where(eq(ordersTable.status, "preparing")),
     db.select().from(ordersTable).where(eq(ordersTable.status, "ready")),
     db.select().from(ordersTable).where(and(
@@ -33,14 +35,14 @@ router.get("/dashboard", async (req, res): Promise<void> => {
     db.select().from(ordersTable)
       .where(and(gte(ordersTable.createdAt, todayStart), lte(ordersTable.createdAt, todayEnd)))
       .orderBy(sql`${ordersTable.createdAt} DESC`)
-      .limit(10),
+      .limit(20),
   ]);
 
   // Today's revenue from paid payments
   const todayPayments = await db.select().from(paymentsTable)
     .innerJoin(ordersTable, eq(paymentsTable.orderId, ordersTable.id))
     .where(and(
-      eq(paymentsTable.status, "paid"),
+      or(eq(paymentsTable.status, "paid"), eq(paymentsTable.status, "partial"))!,
       gte(ordersTable.createdAt, todayStart),
       lte(ordersTable.createdAt, todayEnd),
     ));
@@ -52,7 +54,7 @@ router.get("/dashboard", async (req, res): Promise<void> => {
     .where(and(gte(expensesTable.expenseDate, todayStart), lte(expensesTable.expenseDate, todayEnd)));
   const todayExpenses = todayExpenseRows.reduce((sum, e) => sum + Number(e.amount), 0);
 
-  // Enrich recent orders with items
+  // Enrich recent orders with items + payment
   const enriched = await Promise.all(recentOrders.map(async order => {
     const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
     const [payment] = await db.select().from(paymentsTable).where(eq(paymentsTable.orderId, order.id));
@@ -76,14 +78,17 @@ router.get("/dashboard", async (req, res): Promise<void> => {
     };
   }));
 
+  const activeCount = pendingPaymentOrders.length + approvedOrders.length + preparingOrders.length + readyOrders.length;
+
   res.json({
-    pendingCount: pendingOrders.length,
+    pendingCount: pendingPaymentOrders.length,
+    approvedCount: approvedOrders.length,
     preparingCount: preparingOrders.length,
     readyCount: readyOrders.length,
     completedToday: completedToday.length,
     cancelledToday: cancelledToday.length,
     todayRevenue,
-    todayOrders: completedToday.length + cancelledToday.length + pendingOrders.length + preparingOrders.length + readyOrders.length,
+    todayOrders: activeCount + completedToday.length + cancelledToday.length,
     todayExpenses,
     recentOrders: enriched,
   });

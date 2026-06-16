@@ -144,7 +144,8 @@ export const DeleteProductParams = zod.object({
 export const ListOrdersQueryParams = zod.object({
   "status": zod.coerce.string().optional(),
   "search": zod.coerce.string().optional(),
-  "date": zod.coerce.string().optional()
+  "date": zod.coerce.string().optional(),
+  "customerId": zod.coerce.number().optional()
 })
 
 export const ListOrdersResponseItem = zod.object({
@@ -586,6 +587,7 @@ export const DeleteExpenseParams = zod.object({
  */
 export const GetDashboardResponse = zod.object({
   "pendingCount": zod.number(),
+  "approvedCount": zod.number(),
   "preparingCount": zod.number(),
   "readyCount": zod.number(),
   "completedToday": zod.number(),

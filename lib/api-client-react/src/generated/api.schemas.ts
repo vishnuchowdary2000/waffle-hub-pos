@@ -226,6 +226,7 @@ export interface ExpenseUpdate {
 
 export interface DashboardSummary {
   pendingCount: number;
+  approvedCount: number;
   preparingCount: number;
   readyCount: number;
   completedToday: number;
@@ -265,6 +266,7 @@ export type ListOrdersParams = {
 status?: string;
 search?: string;
 date?: string;
+customerId?: number;
 };
 
 export type ListCustomersParams = {

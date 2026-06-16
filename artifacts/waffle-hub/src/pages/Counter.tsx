@@ -1,20 +1,16 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
-  useListCategories,
-  useListProducts,
-  useCreateOrder,
-  useCreateOrderPayment,
-  useUpdateOrderStatus,
-  getListOrdersQueryKey,
-  getGetDashboardQueryKey,
+  useListCategories, useListProducts, useCreateOrder,
+  useCreateOrderPayment, useUpdateOrderStatus, useListCustomers, useListOrders,
+  getListOrdersQueryKey, getGetDashboardQueryKey, getListCustomersQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDate, STATUS_LABELS } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import {
   Plus, Minus, Trash2, ShoppingCart, Search,
   Banknote, Smartphone, CreditCard, Heart,
-  CheckCircle, X, UtensilsCrossed, ShoppingBag,
+  CheckCircle, X, UtensilsCrossed, ShoppingBag, UserRound, Clock,
 } from "lucide-react";
 
 type ItemOrderType = "dine_in" | "takeaway";
@@ -36,6 +32,16 @@ type PlacedOrder = {
   items: { productName: string; quantity: number; price: number; itemOrderType: string }[];
 };
 
+type Customer = {
+  id: number;
+  name: string;
+  phone: string;
+  orderCount: number;
+  totalSpending: number;
+  favoriteItems?: string | null;
+  lastOrderDate?: string | null;
+};
+
 const ORDER_TYPES = ["dine_in", "takeaway", "delivery"] as const;
 const ORDER_TYPE_LABELS: Record<string, string> = { dine_in: "Dine In", takeaway: "Takeaway", delivery: "Delivery" };
 
@@ -44,6 +50,12 @@ export default function Counter() {
 
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerId, setCustomerId] = useState<number | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [showDrop, setShowDrop] = useState(false);
+  const dropRef = useRef<HTMLDivElement>(null);
+
   const [orderType, setOrderType] = useState<"dine_in" | "takeaway" | "delivery">("dine_in");
   const [notes, setNotes] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -57,6 +69,46 @@ export default function Counter() {
   const createPayment = useCreateOrderPayment();
   const updateStatus = useUpdateOrderStatus();
 
+  // Customer search
+  const { data: customerResults = [] } = useListCustomers(
+    { search: customerQuery },
+    { query: { enabled: customerQuery.length >= 2, queryKey: getListCustomersQueryKey({ search: customerQuery }) } }
+  );
+
+  // Customer order history
+  const { data: customerOrders = [] } = useListOrders(
+    { customerId: selectedCustomer?.id ?? undefined },
+    { query: { enabled: !!selectedCustomer?.id, queryKey: getListOrdersQueryKey({ customerId: selectedCustomer?.id ?? undefined }) } }
+  );
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropRef.current && !dropRef.current.contains(e.target as Node)) {
+        setShowDrop(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleSelectCustomer = (c: Customer) => {
+    setSelectedCustomer(c);
+    setCustomerId(c.id);
+    setCustomerName(c.name);
+    setCustomerPhone(c.phone);
+    setCustomerQuery("");
+    setShowDrop(false);
+  };
+
+  const clearSelectedCustomer = () => {
+    setSelectedCustomer(null);
+    setCustomerId(null);
+    setCustomerName("");
+    setCustomerPhone("");
+    setCustomerQuery("");
+  };
+
   const products = allProducts.filter(p => {
     const matchesCat = activeCategory == null || p.categoryId === activeCategory;
     const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
@@ -69,7 +121,7 @@ export default function Counter() {
       if (existing >= 0) {
         return prev.map((c, i) => i === existing ? { ...c, quantity: c.quantity + 1 } : c);
       }
-      const defaultItemType: ItemOrderType = orderType === "delivery" ? "takeaway" : orderType === "takeaway" ? "takeaway" : "dine_in";
+      const defaultItemType: ItemOrderType = orderType === "dine_in" ? "dine_in" : "takeaway";
       return [...prev, { productId: p.id, productName: p.name, price: p.price, quantity: 1, itemOrderType: defaultItemType }];
     });
   };
@@ -88,13 +140,15 @@ export default function Counter() {
   };
 
   const removeItem = (idx: number) => setCart(prev => prev.filter((_, i) => i !== idx));
-
   const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
 
   const resetForm = () => {
     setCart([]);
     setCustomerName("");
     setCustomerPhone("");
+    setCustomerId(null);
+    setSelectedCustomer(null);
+    setCustomerQuery("");
     setNotes("");
   };
 
@@ -104,6 +158,7 @@ export default function Counter() {
       data: {
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim() || undefined,
+        customerId,
         orderType,
         notes: notes.trim() || undefined,
         items: cart.map(c => ({
@@ -130,6 +185,8 @@ export default function Counter() {
     });
   };
 
+  const recentCompletedOrders = customerOrders.filter(o => o.status === "completed").slice(0, 3);
+
   return (
     <div className="flex h-full overflow-hidden flex-col md:flex-row">
       {/* Left: Menu */}
@@ -149,19 +206,13 @@ export default function Counter() {
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
             <button
               onClick={() => setActiveCategory(null)}
-              className={cn(
-                "shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-                activeCategory == null ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"
-              )}
+              className={cn("shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                activeCategory == null ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground")}
             >All</button>
             {categories.filter(c => c.active).map(c => (
-              <button
-                key={c.id}
-                onClick={() => setActiveCategory(c.id)}
-                className={cn(
-                  "shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-                  activeCategory === c.id ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"
-                )}
+              <button key={c.id} onClick={() => setActiveCategory(c.id)}
+                className={cn("shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                  activeCategory === c.id ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground")}
               >{c.name}</button>
             ))}
           </div>
@@ -175,16 +226,9 @@ export default function Counter() {
               {products.map(p => {
                 const inCart = cart.find(c => c.productId === p.id);
                 return (
-                  <button
-                    key={p.id}
-                    onClick={() => addToCart(p)}
-                    className={cn(
-                      "relative rounded-xl p-4 text-left border transition-all active:scale-95",
-                      inCart
-                        ? "bg-primary/15 border-primary/50 shadow-md"
-                        : "bg-card border-card-border hover:border-primary/30"
-                    )}
-                  >
+                  <button key={p.id} onClick={() => addToCart(p)}
+                    className={cn("relative rounded-xl p-4 text-left border transition-all active:scale-95",
+                      inCart ? "bg-primary/15 border-primary/50 shadow-md" : "bg-card border-card-border hover:border-primary/30")}>
                     {inCart && (
                       <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
                         <span className="text-primary-foreground text-xs font-bold">{inCart.quantity}</span>
@@ -201,42 +245,118 @@ export default function Counter() {
         </div>
       </div>
 
-      {/* Right: Order form + cart */}
+      {/* Right: Order form */}
       <div className="md:w-80 lg:w-96 bg-card border-t md:border-t-0 md:border-l border-card-border flex flex-col max-h-80 md:max-h-none">
         <div className="p-4 border-b border-card-border space-y-3 shrink-0">
           <h2 className="text-base font-bold text-foreground flex items-center gap-2">
             <ShoppingCart size={16} className="text-primary" /> New Order
           </h2>
+
+          {/* Order type */}
           <div className="grid grid-cols-3 gap-1.5">
             {ORDER_TYPES.map(t => (
-              <button
-                key={t}
-                onClick={() => setOrderType(t)}
-                className={cn(
-                  "py-2 rounded-lg text-xs font-semibold transition-colors border",
-                  orderType === t
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-secondary text-muted-foreground border-transparent hover:border-border"
-                )}
-              >{ORDER_TYPE_LABELS[t]}</button>
+              <button key={t} onClick={() => setOrderType(t)}
+                className={cn("py-2 rounded-lg text-xs font-semibold transition-colors border",
+                  orderType === t ? "bg-primary text-primary-foreground border-primary" : "bg-secondary text-muted-foreground border-transparent hover:border-border")}>
+                {ORDER_TYPE_LABELS[t]}
+              </button>
             ))}
           </div>
-          <input
-            type="text"
-            placeholder="Customer name *"
-            value={customerName}
-            onChange={e => setCustomerName(e.target.value)}
-            className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <input
-            type="tel"
-            placeholder="Mobile number"
-            value={customerPhone}
-            onChange={e => setCustomerPhone(e.target.value)}
-            className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+
+          {/* Customer search */}
+          <div ref={dropRef} className="relative">
+            <div className="relative">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search existing customer..."
+                value={customerQuery}
+                onChange={e => { setCustomerQuery(e.target.value); setShowDrop(true); }}
+                onFocus={() => { if (customerQuery.length >= 2) setShowDrop(true); }}
+                className="w-full bg-background border border-input rounded-lg pl-8 pr-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+
+            {/* Customer dropdown */}
+            {showDrop && customerQuery.length >= 2 && (
+              <div className="absolute z-20 top-full inset-x-0 mt-1 bg-popover border border-border rounded-xl shadow-2xl max-h-52 overflow-y-auto">
+                {customerResults.length === 0 ? (
+                  <p className="px-3 py-3 text-sm text-muted-foreground text-center">No customers found</p>
+                ) : (
+                  customerResults.map(c => (
+                    <button key={c.id} onClick={() => handleSelectCustomer(c)}
+                      className="w-full text-left px-3 py-2.5 hover:bg-secondary transition-colors border-b border-border/40 last:border-0 flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-foreground truncate">{c.name}</p>
+                        <p className="text-xs text-muted-foreground">{c.phone}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs text-primary font-semibold">{formatCurrency(c.totalSpending)}</p>
+                        <p className="text-xs text-muted-foreground">{c.orderCount} orders</p>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Selected customer card */}
+          {selectedCustomer && (
+            <div className="bg-primary/8 border border-primary/25 rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <UserRound size={14} className="text-primary shrink-0" />
+                  <span className="font-semibold text-sm text-foreground">{selectedCustomer.name}</span>
+                </div>
+                <button onClick={clearSelectedCustomer} className="text-muted-foreground hover:text-foreground p-0.5">
+                  <X size={13} />
+                </button>
+              </div>
+              <div className="flex gap-3 text-xs text-muted-foreground">
+                <span>{selectedCustomer.orderCount} orders</span>
+                <span>·</span>
+                <span>{formatCurrency(selectedCustomer.totalSpending)} total</span>
+                {selectedCustomer.lastOrderDate && (
+                  <>
+                    <span>·</span>
+                    <span>Last: {formatDate(selectedCustomer.lastOrderDate)}</span>
+                  </>
+                )}
+              </div>
+              {selectedCustomer.favoriteItems && (
+                <p className="text-xs text-muted-foreground truncate">
+                  Favorites: {selectedCustomer.favoriteItems}
+                </p>
+              )}
+              {/* Order history */}
+              {recentCompletedOrders.length > 0 && (
+                <div className="border-t border-border/40 pt-2 space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <Clock size={10} /> Recent orders
+                  </p>
+                  {recentCompletedOrders.map(o => (
+                    <div key={o.id} className="flex items-center justify-between text-xs">
+                      <span className="font-mono text-muted-foreground">{o.orderNumber}</span>
+                      <span className="text-foreground truncate mx-2 flex-1">
+                        {o.items.map(i => `${i.productName}×${i.quantity}`).join(", ")}
+                      </span>
+                      <span className="text-primary font-semibold shrink-0">{formatCurrency(o.totalAmount)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Name & phone */}
+          <input type="text" placeholder="Customer name *" value={customerName} onChange={e => setCustomerName(e.target.value)}
+            className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+          <input type="tel" placeholder="Mobile number" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+            className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
         </div>
 
+        {/* Cart */}
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {cart.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">Tap menu items to add</p>
@@ -250,11 +370,11 @@ export default function Counter() {
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button onClick={() => updateQty(idx, -1)} className="w-6 h-6 rounded-md bg-secondary flex items-center justify-center">
-                      <Minus size={10} className="text-foreground" />
+                      <Minus size={10} />
                     </button>
                     <span className="w-6 text-center text-sm font-bold">{item.quantity}</span>
                     <button onClick={() => updateQty(idx, 1)} className="w-6 h-6 rounded-md bg-secondary flex items-center justify-center">
-                      <Plus size={10} className="text-foreground" />
+                      <Plus size={10} />
                     </button>
                     <button onClick={() => removeItem(idx)} className="w-6 h-6 rounded-md text-destructive/60 hover:text-destructive ml-1">
                       <Trash2 size={12} />
@@ -262,20 +382,12 @@ export default function Counter() {
                   </div>
                   <span className="text-sm font-bold text-primary shrink-0">{formatCurrency(item.price * item.quantity)}</span>
                 </div>
-                {/* Per-item type toggle */}
-                <button
-                  onClick={() => toggleItemType(idx)}
-                  className={cn(
-                    "flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md transition-colors",
+                <button onClick={() => toggleItemType(idx)}
+                  className={cn("flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md transition-colors",
                     item.itemOrderType === "takeaway"
                       ? "bg-blue-500/15 text-blue-400 border border-blue-500/30"
-                      : "bg-secondary text-muted-foreground border border-transparent hover:border-border"
-                  )}
-                >
-                  {item.itemOrderType === "takeaway"
-                    ? <><ShoppingBag size={10} /> Takeaway</>
-                    : <><UtensilsCrossed size={10} /> Dine In</>
-                  }
+                      : "bg-secondary text-muted-foreground border border-transparent hover:border-border")}>
+                  {item.itemOrderType === "takeaway" ? <><ShoppingBag size={10} /> Takeaway</> : <><UtensilsCrossed size={10} /> Dine In</>}
                 </button>
               </div>
             ))
@@ -283,31 +395,21 @@ export default function Counter() {
         </div>
 
         <div className="p-4 border-t border-card-border shrink-0 space-y-3">
-          <input
-            type="text"
-            placeholder="Special instructions (optional)"
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            className="w-full bg-background border border-input rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+          <input type="text" placeholder="Special instructions (optional)" value={notes} onChange={e => setNotes(e.target.value)}
+            className="w-full bg-background border border-input rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">{cart.length} item{cart.length !== 1 ? "s" : ""}</span>
             <span className="text-xl font-bold text-primary">{formatCurrency(total)}</span>
           </div>
-          {/* Takeaway summary */}
           {cart.some(i => i.itemOrderType === "takeaway") && (
             <div className="flex items-center gap-1.5 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
               <ShoppingBag size={12} />
-              <span>
-                {cart.filter(i => i.itemOrderType === "takeaway").reduce((s, i) => s + i.quantity, 0)} item{cart.filter(i => i.itemOrderType === "takeaway").reduce((s, i) => s + i.quantity, 0) !== 1 ? "s" : ""} need packaging
-              </span>
+              <span>{cart.filter(i => i.itemOrderType === "takeaway").reduce((s, i) => s + i.quantity, 0)} item(s) need packaging</span>
             </div>
           )}
-          <button
-            onClick={placeOrder}
+          <button onClick={placeOrder}
             disabled={!customerName.trim() || cart.length === 0 || createOrder.isPending}
-            className="w-full py-3.5 rounded-xl text-base font-bold bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-          >
+            className="w-full py-3.5 rounded-xl text-base font-bold bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
             {createOrder.isPending ? "Placing..." : "Place Order →"}
           </button>
         </div>
@@ -331,10 +433,7 @@ export default function Counter() {
 }
 
 function PaymentModal({
-  order,
-  createPayment,
-  updateStatus,
-  onClose,
+  order, createPayment, updateStatus, onClose,
 }: {
   order: PlacedOrder;
   createPayment: ReturnType<typeof useCreateOrderPayment>;
@@ -346,6 +445,7 @@ function PaymentModal({
   const [card, setCard] = useState("");
   const [isCharity, setIsCharity] = useState(false);
   const [done, setDone] = useState(false);
+  const [doneLabel, setDoneLabel] = useState("");
 
   const cashAmt = parseFloat(cash) || 0;
   const upiAmt = parseFloat(upi) || 0;
@@ -353,27 +453,33 @@ function PaymentModal({
   const totalPaid = isCharity ? order.totalAmount : cashAmt + upiAmt + cardAmt;
   const balance = order.totalAmount - totalPaid;
   const canPayNow = isCharity || totalPaid > 0;
+  const takeawayItems = order.items.filter(i => i.itemOrderType === "takeaway");
 
   const handlePayNow = () => {
-    const payload = isCharity
-      ? { totalAmount: order.totalAmount, cashAmount: 0, upiAmount: 0, cardAmount: 0 }
-      : { totalAmount: order.totalAmount, cashAmount: cashAmt, upiAmount: upiAmt, cardAmount: cardAmt };
-
+    if (isCharity) {
+      // Charity: mark completed directly
+      updateStatus.mutate({ id: order.id, data: { status: "completed" } }, {
+        onSuccess: () => { setDoneLabel("Charity — Completed!"); setDone(true); setTimeout(onClose, 1500); },
+      });
+      return;
+    }
+    const payload = { totalAmount: order.totalAmount, cashAmount: cashAmt, upiAmount: upiAmt, cardAmount: cardAmt };
     createPayment.mutate({ id: order.id, data: payload }, {
       onSuccess: () => {
-        if (isCharity) {
-          updateStatus.mutate({ id: order.id, data: { status: "completed" } }, {
-            onSuccess: () => { setDone(true); setTimeout(onClose, 1500); },
-          });
-        } else {
-          setDone(true);
-          setTimeout(onClose, 1500);
-        }
+        // Backend auto-approves; show confirmation
+        setDoneLabel(balance <= 0 ? "Paid & Sent to Kitchen!" : "Partial Payment Saved!");
+        setDone(true);
+        setTimeout(onClose, 1500);
       },
     });
   };
 
-  const handlePayLater = () => { onClose(); };
+  const handleSendToKitchen = () => {
+    // Approve without payment — kitchen can proceed
+    updateStatus.mutate({ id: order.id, data: { status: "approved" } }, {
+      onSuccess: () => { setDoneLabel("Sent to Kitchen!"); setDone(true); setTimeout(onClose, 1200); },
+    });
+  };
 
   const handleSetFull = (method: "cash" | "upi") => {
     if (method === "cash") { setCash(String(order.totalAmount)); setUpi(""); setCard(""); }
@@ -384,29 +490,27 @@ function PaymentModal({
     return (
       <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
         <div className="bg-card border border-card-border rounded-2xl p-8 text-center shadow-2xl">
-          <CheckCircle size={48} className={isCharity ? "text-purple-400 mx-auto mb-3" : "text-green-400 mx-auto mb-3"} />
-          <p className="text-xl font-bold text-foreground">{isCharity ? "Charity Order!" : "Order Confirmed!"}</p>
-          <p className="text-muted-foreground text-sm mt-1">{order.orderNumber} sent to Kitchen</p>
+          <CheckCircle size={48} className="text-green-400 mx-auto mb-3" />
+          <p className="text-xl font-bold text-foreground">{doneLabel}</p>
+          <p className="text-muted-foreground text-sm mt-1">{order.orderNumber}</p>
         </div>
       </div>
     );
   }
 
-  const takeawayItems = order.items.filter(i => i.itemOrderType === "takeaway");
-
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
       <div className="bg-card border border-card-border rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b border-border">
-          <div className="flex items-center justify-between mb-1">
-            <h2 className="text-lg font-bold text-foreground">Order {order.orderNumber}</h2>
-            <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X size={18} /></button>
+        <div className="px-6 pt-5 pb-4 border-b border-border">
+          <div className="flex items-center justify-between mb-0.5">
+            <h2 className="text-lg font-bold text-foreground">{order.orderNumber}</h2>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1"><X size={18} /></button>
           </div>
-          <p className="text-sm text-muted-foreground">{order.customerName}</p>
+          <p className="text-sm text-muted-foreground">{order.customerName} · {ORDER_TYPE_LABELS[order.orderType] ?? order.orderType}</p>
         </div>
 
-        <div className="px-6 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
-          {/* Order summary with item types */}
+        <div className="px-6 py-4 space-y-4 max-h-[72vh] overflow-y-auto">
+          {/* Item list */}
           <div className="space-y-1.5">
             {order.items.map((item, i) => (
               <div key={i} className="flex items-center justify-between gap-2">
@@ -430,21 +534,15 @@ function PaymentModal({
             </div>
           )}
 
-          <div className="border-t border-border pt-3 flex justify-between">
+          <div className="border-t border-border pt-3 flex justify-between items-center">
             <span className="font-semibold text-foreground">Total</span>
             <span className="text-xl font-bold text-primary">{formatCurrency(order.totalAmount)}</span>
           </div>
 
           {/* Charity toggle */}
-          <button
-            onClick={() => setIsCharity(v => !v)}
-            className={cn(
-              "w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 border transition-colors",
-              isCharity
-                ? "bg-purple-500/20 border-purple-500/50 text-purple-400"
-                : "bg-secondary border-border text-muted-foreground hover:text-foreground"
-            )}
-          >
+          <button onClick={() => setIsCharity(v => !v)}
+            className={cn("w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 border transition-colors",
+              isCharity ? "bg-purple-500/20 border-purple-500/50 text-purple-400" : "bg-secondary border-border text-muted-foreground hover:text-foreground")}>
             <Heart size={14} />
             {isCharity ? "Charity — No Payment Needed" : "Mark as Charity"}
           </button>
@@ -472,22 +570,38 @@ function PaymentModal({
                 </div>
               </div>
 
-              {totalPaid > 0 && (
-                <div className={cn("rounded-lg px-3 py-2 text-sm font-semibold flex justify-between",
-                  balance <= 0 ? "bg-green-500/15 text-green-400" : "bg-amber-500/15 text-amber-400")}>
-                  <span>{balance <= 0 ? "✓ Fully Paid" : "Balance Due"}</span>
-                  <span>{balance <= 0 ? formatCurrency(totalPaid) : formatCurrency(balance)}</span>
+              {/* Payment summary */}
+              <div className="bg-secondary rounded-xl p-3 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total Amount</span>
+                  <span className="font-semibold text-foreground">{formatCurrency(order.totalAmount)}</span>
                 </div>
-              )}
+                {totalPaid > 0 && (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Amount Paid</span>
+                      <span className="font-semibold text-green-400">{formatCurrency(totalPaid)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-bold border-t border-border/50 pt-2">
+                      <span className={balance > 0 ? "text-amber-400" : "text-green-400"}>
+                        {balance > 0 ? "Pending Amount" : "✓ Fully Paid"}
+                      </span>
+                      <span className={balance > 0 ? "text-amber-400" : "text-green-400"}>
+                        {balance > 0 ? formatCurrency(balance) : formatCurrency(totalPaid)}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           )}
 
           <div className="flex gap-2 pt-1">
-            <button onClick={handlePayLater}
-              className="flex-1 py-3 rounded-xl bg-secondary text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
-              Send to Kitchen
+            <button onClick={handleSendToKitchen} disabled={updateStatus.isPending}
+              className="flex-1 py-3 rounded-xl bg-secondary text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50">
+              {updateStatus.isPending ? "..." : "Send to Kitchen"}
             </button>
-            <button onClick={handlePayNow} disabled={!canPayNow || createPayment.isPending}
+            <button onClick={handlePayNow} disabled={(!canPayNow && !isCharity) || createPayment.isPending || updateStatus.isPending}
               className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 disabled:opacity-40 transition-all">
               {createPayment.isPending ? "..." : isCharity ? "Confirm Charity" : "Pay & Send"}
             </button>

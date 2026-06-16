@@ -9,7 +9,7 @@ export const ordersTable = pgTable("orders", {
   customerName: text("customer_name").notNull(),
   customerPhone: text("customer_phone"),
   orderType: text("order_type").notNull().default("dine_in"),
-  status: text("status").notNull().default("pending"),
+  status: text("status").notNull().default("pending_payment"),
   notes: text("notes"),
   totalAmount: numeric("total_amount", { precision: 10, scale: 2 }).notNull().default("0"),
   readyTime: timestamp("ready_time", { withTimezone: true }).notNull(),

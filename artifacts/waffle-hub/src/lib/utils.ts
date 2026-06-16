@@ -57,16 +57,16 @@ export function playNotificationSound() {
 }
 
 export const STATUS_LABELS: Record<string, string> = {
-  pending: "Pending",
-  preparing: "Preparing",
-  ready: "Ready",
-  completed: "Completed",
-  cancelled: "Cancelled",
+  pending_payment: "Pending Payment",
+  approved:        "Approved",
+  preparing:       "Preparing",
+  ready:           "Ready",
+  completed:       "Completed",
+  cancelled:       "Cancelled",
 };
 
 export const ORDER_TYPE_LABELS: Record<string, string> = {
-  dine_in: "Dine In",
+  dine_in:  "Dine In",
   takeaway: "Takeaway",
   delivery: "Delivery",
 };
-

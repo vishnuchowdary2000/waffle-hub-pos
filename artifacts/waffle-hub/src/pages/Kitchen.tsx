@@ -13,6 +13,8 @@ import {
 type ViewMode = "orders" | "batch";
 type ConfirmState = { orderId: number; orderNumber: string; customerName: string } | null;
 
+const ACTIVE_STATUSES = "approved,preparing,ready";
+
 export default function Kitchen() {
   const qc = useQueryClient();
   const prevOrderIds = useRef<Set<number>>(new Set());
@@ -20,12 +22,11 @@ export default function Kitchen() {
   const [confirm, setConfirm] = useState<ConfirmState>(null);
   const [prepOpen, setPrepOpen] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("orders");
-  // Batch view: prepared counts per product name (client-side)
   const [prepared, setPrepared] = useState<Record<string, number>>({});
 
   const { data: orders = [], isLoading } = useListOrders(
-    { status: "pending,preparing,ready" },
-    { query: { refetchInterval: 3000, queryKey: getListOrdersQueryKey({ status: "pending,preparing,ready" }) } }
+    { status: ACTIVE_STATUSES },
+    { query: { refetchInterval: 3000, queryKey: getListOrdersQueryKey({ status: ACTIVE_STATUSES }) } }
   );
 
   const updateStatus = useUpdateOrderStatus();
@@ -48,40 +49,33 @@ export default function Kitchen() {
 
   const changeStatus = (id: number, status: string) => {
     updateStatus.mutate({ id, data: { status } }, {
-      onSuccess: () => qc.invalidateQueries({ queryKey: getListOrdersQueryKey({ status: "pending,preparing,ready" }) }),
+      onSuccess: () => qc.invalidateQueries({ queryKey: getListOrdersQueryKey({ status: ACTIVE_STATUSES }) }),
     });
   };
 
-  const pending = orders.filter(o => o.status === "pending");
+  const approved  = orders.filter(o => o.status === "approved");
   const preparing = orders.filter(o => o.status === "preparing");
-  const ready = orders.filter(o => o.status === "ready");
+  const ready     = orders.filter(o => o.status === "ready");
 
-  // Aggregate items from pending + preparing orders by product name
-  const activeOrders = orders.filter(o => o.status === "pending" || o.status === "preparing");
+  // Batch view: aggregate items from approved + preparing
+  const activeOrders = orders.filter(o => o.status === "approved" || o.status === "preparing");
   const batchMap = new Map<string, number>();
   for (const order of activeOrders) {
     for (const item of order.items) {
       batchMap.set(item.productName, (batchMap.get(item.productName) ?? 0) + item.quantity);
     }
   }
-  // Build batch items: remaining = needed - prepared
   const batchItems = Array.from(batchMap.entries())
     .map(([name, needed]) => ({ name, needed, preparedCount: prepared[name] ?? 0, remaining: needed - (prepared[name] ?? 0) }))
     .sort((a, b) => b.remaining - a.remaining);
 
-  const adjustPrepared = (name: string, delta: number) => {
+  const adjustPrepared = (name: string, delta: number) =>
     setPrepared(prev => ({ ...prev, [name]: Math.max(0, (prev[name] ?? 0) + delta) }));
-  };
-  const resetPrepared = (name: string) => {
+  const resetPrepared = (name: string) =>
     setPrepared(prev => { const n = { ...prev }; delete n[name]; return n; });
-  };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full bg-background">
-        <RefreshCw className="animate-spin text-primary" size={32} />
-      </div>
-    );
+    return <div className="flex items-center justify-center h-full bg-background"><RefreshCw className="animate-spin text-primary" size={32} /></div>;
   }
 
   return (
@@ -90,22 +84,20 @@ export default function Kitchen() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Kitchen Display</h1>
-          <p className="text-sm text-muted-foreground">{orders.length} active · {pending.length} pending · {preparing.length} preparing · {ready.length} ready</p>
+          <p className="text-sm text-muted-foreground">
+            {orders.length} active · {approved.length} approved · {preparing.length} preparing · {ready.length} ready
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-secondary rounded-lg p-1">
-            <button
-              onClick={() => setViewMode("orders")}
+            <button onClick={() => setViewMode("orders")}
               className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors",
-                viewMode === "orders" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-            >
+                viewMode === "orders" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
               <List size={13} /> Orders
             </button>
-            <button
-              onClick={() => setViewMode("batch")}
+            <button onClick={() => setViewMode("batch")}
               className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors",
-                viewMode === "batch" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-            >
+                viewMode === "batch" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
               <LayoutGrid size={13} /> Batch
             </button>
           </div>
@@ -116,7 +108,7 @@ export default function Kitchen() {
         </div>
       </div>
 
-      {/* ── BATCH VIEW ────────────────────────────────────────────────────── */}
+      {/* ── BATCH VIEW ── */}
       {viewMode === "batch" && (
         <div className="space-y-4">
           {batchItems.length === 0 ? (
@@ -130,7 +122,7 @@ export default function Kitchen() {
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Tap + when you prepare a batch. Negative = extra stock available.</p>
                 {Object.keys(prepared).length > 0 && (
-                  <button onClick={() => setPrepared({})} className="text-xs text-muted-foreground hover:text-destructive transition-colors flex items-center gap-1">
+                  <button onClick={() => setPrepared({})} className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1">
                     <RotateCcw size={12} /> Reset All
                   </button>
                 )}
@@ -141,44 +133,33 @@ export default function Kitchen() {
                     className={cn("bg-card border rounded-2xl p-5 space-y-4",
                       item.remaining < 0 ? "border-green-500/40 bg-green-500/5" :
                       item.remaining === 0 ? "border-muted bg-secondary/30" :
-                      item.remaining <= 3 ? "border-amber-500/40 bg-amber-500/5" :
-                      "border-card-border"
-                    )}>
+                      item.remaining <= 3 ? "border-amber-500/40 bg-amber-500/5" : "border-card-border")}>
                     <div>
                       <p className="font-bold text-foreground text-base leading-snug">{item.name}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Needed from orders: {item.needed}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Needed: {item.needed}</p>
                     </div>
-
-                    {/* Remaining counter — huge */}
                     <div className="text-center py-2">
                       <p className={cn("text-6xl font-black tabular-nums",
                         item.remaining < 0 ? "text-green-400" :
                         item.remaining === 0 ? "text-muted-foreground" :
-                        item.remaining <= 3 ? "text-amber-400" :
-                        "text-foreground"
-                      )}>
+                        item.remaining <= 3 ? "text-amber-400" : "text-foreground")}>
                         {item.remaining < 0 ? `+${Math.abs(item.remaining)}` : item.remaining}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {item.remaining < 0 ? "extra stock ready" : item.remaining === 0 ? "all prepared ✓" : "still needed"}
+                        {item.remaining < 0 ? "extra stock" : item.remaining === 0 ? "all prepared ✓" : "still needed"}
                       </p>
                     </div>
-
-                    {/* Prepared row */}
                     {item.preparedCount > 0 && (
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Prepared</span>
                         <div className="flex items-center gap-1.5">
                           <span className="font-bold text-primary">{item.preparedCount}</span>
-                          <button onClick={() => resetPrepared(item.name)}
-                            className="text-muted-foreground hover:text-destructive transition-colors">
+                          <button onClick={() => resetPrepared(item.name)} className="text-muted-foreground hover:text-destructive">
                             <RotateCcw size={12} />
                           </button>
                         </div>
                       </div>
                     )}
-
-                    {/* +/- batch controls */}
                     <div className="grid grid-cols-3 gap-2">
                       <button onClick={() => adjustPrepared(item.name, -1)}
                         className="py-3 rounded-xl bg-secondary hover:bg-muted text-foreground font-bold text-lg flex items-center justify-center transition-colors">
@@ -201,16 +182,14 @@ export default function Kitchen() {
         </div>
       )}
 
-      {/* ── ORDERS VIEW ───────────────────────────────────────────────────── */}
+      {/* ── ORDERS VIEW ── */}
       {viewMode === "orders" && (
         <>
-          {/* Prep summary panel */}
+          {/* Prep summary */}
           {batchItems.length > 0 && (
             <div className="bg-amber-500/8 border border-amber-500/25 rounded-xl overflow-hidden">
-              <button
-                onClick={() => setPrepOpen(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 text-left"
-              >
+              <button onClick={() => setPrepOpen(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-left">
                 <div className="flex items-center gap-2">
                   <ClipboardList size={16} className="text-amber-400" />
                   <span className="font-bold text-sm text-amber-400">
@@ -240,11 +219,11 @@ export default function Kitchen() {
             </div>
           )}
 
-          {pending.length > 0 && (
-            <Section title="Pending" count={pending.length} color="text-amber-400">
-              {pending.map(order => (
+          {approved.length > 0 && (
+            <Section title="Approved — Ready to Cook" count={approved.length} color="text-violet-400">
+              {approved.map(order => (
                 <OrderCard key={order.id} order={order} countdown={countdowns[order.id] ?? ""}
-                  statusColor="border-amber-500/40 bg-amber-500/5"
+                  statusColor="border-violet-500/40 bg-violet-500/5"
                   onPrepare={() => changeStatus(order.id, "preparing")}
                   onCancelRequest={() => setConfirm({ orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName })}
                   showPrepare />
@@ -277,7 +256,7 @@ export default function Kitchen() {
         </>
       )}
 
-      {/* Cancel confirmation modal */}
+      {/* Cancel modal */}
       {confirm && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
           <div className="bg-card border border-card-border rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
@@ -298,7 +277,7 @@ export default function Kitchen() {
                 <X size={14} /> Keep
               </button>
               <button onClick={() => { changeStatus(confirm.orderId, "cancelled"); setConfirm(null); }} disabled={updateStatus.isPending}
-                className="flex-1 py-3 rounded-xl bg-destructive text-white text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
+                className="flex-1 py-3 rounded-xl bg-destructive text-white text-sm font-bold hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1.5">
                 <Trash2 size={14} /> Cancel Order
               </button>
             </div>
@@ -315,9 +294,7 @@ function Section({ title, count, color, children }: { title: string; count: numb
       <h2 className={cn("text-lg font-bold mb-3", color)}>
         {title} <span className="text-muted-foreground font-normal text-sm">({count})</span>
       </h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {children}
-      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">{children}</div>
     </div>
   );
 }
@@ -368,9 +345,7 @@ function OrderCard({
           <div key={item.id} className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-base font-medium text-foreground truncate">{item.productName}</span>
-              {item.itemOrderType === "takeaway" && (
-                <ShoppingBag size={11} className="text-blue-400 shrink-0" />
-              )}
+              {item.itemOrderType === "takeaway" && <ShoppingBag size={11} className="text-blue-400 shrink-0" />}
             </div>
             <span className="text-lg font-bold text-primary ml-3 shrink-0">×{item.quantity}</span>
           </div>
@@ -383,7 +358,7 @@ function OrderCard({
         </div>
       )}
 
-      {/* Payment status badge */}
+      {/* Payment badge */}
       {(() => {
         const p = order.payment;
         if (!p) return (

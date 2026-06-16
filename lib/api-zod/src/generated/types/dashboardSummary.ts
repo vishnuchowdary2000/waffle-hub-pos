@@ -9,6 +9,7 @@ import type { Order } from './order';
 
 export interface DashboardSummary {
   pendingCount: number;
+  approvedCount: number;
   preparingCount: number;
   readyCount: number;
   completedToday: number;
