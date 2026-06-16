@@ -1,28 +1,47 @@
-import { useListOrders, useUpdateOrderStatus, getListOrdersQueryKey, type ListOrdersQueryResult } from "@workspace/api-client-react";
+import {
+  useListOrders,
+  useUpdateOrderStatus,
+  getListOrdersQueryKey,
+  type ListOrdersQueryResult,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { formatTime, getCountdown, playNotificationSound } from "@/lib/utils";
+import { playNotificationSound } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import {
-  Clock, RefreshCw, AlertTriangle, X, Trash2,
-  ChevronDown, ChevronUp, ClipboardList,
-  LayoutGrid, List, ShoppingBag, Phone,
-  Plus, Minus, RotateCcw,
+  Clock, RefreshCw, ChefHat, ShoppingBag,
+  UtensilsCrossed, Zap,
 } from "lucide-react";
-
-type ViewMode = "orders" | "batch";
-type ConfirmState = { orderId: number; orderNumber: string; customerName: string } | null;
 
 const ACTIVE_STATUSES = "approved,preparing,ready";
 
+type Order = ListOrdersQueryResult[number];
+
+const STATUS_META: Record<string, { label: string; cardBorder: string; badge: string }> = {
+  approved:  { label: "New",       cardBorder: "border-violet-500/50 bg-violet-500/5", badge: "bg-violet-500/20 text-violet-300 border-violet-500/30" },
+  preparing: { label: "Preparing", cardBorder: "border-blue-500/50 bg-blue-500/5",     badge: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
+  ready:     { label: "Ready ✓",   cardBorder: "border-green-500/50 bg-green-500/5",   badge: "bg-green-500/20 text-green-300 border-green-500/30" },
+};
+
+function elapsed(createdAt: string) {
+  const diff = Math.floor((Date.now() - new Date(createdAt).getTime()) / 1000);
+  if (diff < 60) return `${diff}s`;
+  const m = Math.floor(diff / 60);
+  if (m < 60) return `${m}m`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+function sortOrders(orders: Order[]) {
+  return [...orders].sort((a, b) => {
+    if (a.priority !== b.priority) return a.priority ? -1 : 1;
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
+}
+
 export default function Kitchen() {
   const qc = useQueryClient();
-  const prevOrderIds = useRef<Set<number>>(new Set());
-  const [countdowns, setCountdowns] = useState<Record<number, string>>({});
-  const [confirm, setConfirm] = useState<ConfirmState>(null);
-  const [prepOpen, setPrepOpen] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>("orders");
-  const [prepared, setPrepared] = useState<Record<string, number>>({});
+  const prevIds = useRef<Set<number>>(new Set());
+  const [tick, setTick] = useState(0);
 
   const { data: orders = [], isLoading } = useListOrders(
     { status: ACTIVE_STATUSES },
@@ -32,373 +51,214 @@ export default function Kitchen() {
   const updateStatus = useUpdateOrderStatus();
 
   useEffect(() => {
-    const currentIds = new Set(orders.map(o => o.id));
-    const hasNew = orders.some(o => !prevOrderIds.current.has(o.id));
-    if (hasNew && prevOrderIds.current.size > 0) playNotificationSound();
-    prevOrderIds.current = currentIds;
+    const cur = new Set(orders.map(o => o.id));
+    if (prevIds.current.size > 0 && orders.some(o => !prevIds.current.has(o.id))) {
+      playNotificationSound();
+    }
+    prevIds.current = cur;
   }, [orders]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const updated: Record<number, string> = {};
-      orders.forEach(o => { updated[o.id] = getCountdown(o.readyTime); });
-      setCountdowns(updated);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [orders]);
+    const t = setInterval(() => setTick(x => x + 1), 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  void tick;
 
   const changeStatus = (id: number, status: string) => {
-    updateStatus.mutate({ id, data: { status } }, {
-      onSuccess: () => qc.invalidateQueries({ queryKey: getListOrdersQueryKey({ status: ACTIVE_STATUSES }) }),
-    });
+    updateStatus.mutate(
+      { id, data: { status } },
+      { onSuccess: () => qc.invalidateQueries({ queryKey: getListOrdersQueryKey({ status: ACTIVE_STATUSES }) }) }
+    );
   };
 
-  const approved  = orders.filter(o => o.status === "approved");
-  const preparing = orders.filter(o => o.status === "preparing");
-  const ready     = orders.filter(o => o.status === "ready");
-
-  // Batch view: aggregate items from approved + preparing
-  const activeOrders = orders.filter(o => o.status === "approved" || o.status === "preparing");
-  const batchMap = new Map<string, number>();
-  for (const order of activeOrders) {
-    for (const item of order.items) {
-      batchMap.set(item.productName, (batchMap.get(item.productName) ?? 0) + item.quantity);
-    }
-  }
-  const batchItems = Array.from(batchMap.entries())
-    .map(([name, needed]) => ({ name, needed, preparedCount: prepared[name] ?? 0, remaining: needed - (prepared[name] ?? 0) }))
-    .sort((a, b) => b.remaining - a.remaining);
-
-  const adjustPrepared = (name: string, delta: number) =>
-    setPrepared(prev => ({ ...prev, [name]: Math.max(0, (prev[name] ?? 0) + delta) }));
-  const resetPrepared = (name: string) =>
-    setPrepared(prev => { const n = { ...prev }; delete n[name]; return n; });
-
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-full bg-background"><RefreshCw className="animate-spin text-primary" size={32} /></div>;
-  }
+  const dineIn   = sortOrders(orders.filter(o => o.orderType === "dine_in"));
+  const takeaway = sortOrders(orders.filter(o => o.orderType !== "dine_in"));
 
   return (
-    <div className="min-h-screen bg-background p-4 space-y-4">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Kitchen Display</h1>
-          <p className="text-sm text-muted-foreground">
-            {orders.length} active · {approved.length} approved · {preparing.length} preparing · {ready.length} ready
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-secondary rounded-lg p-1">
-            <button onClick={() => setViewMode("orders")}
-              className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors",
-                viewMode === "orders" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-              <List size={13} /> Orders
-            </button>
-            <button onClick={() => setViewMode("batch")}
-              className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors",
-                viewMode === "batch" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-              <LayoutGrid size={13} /> Batch
-            </button>
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+            <ChefHat size={16} className="text-primary" />
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            Live
-          </div>
-        </div>
-      </div>
-
-      {/* ── BATCH VIEW ── */}
-      {viewMode === "batch" && (
-        <div className="space-y-4">
-          {batchItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-              <ClipboardList size={48} className="mb-4 opacity-40" />
-              <p className="text-lg font-medium">No items to prepare</p>
-              <p className="text-sm">Waiting for orders...</p>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">Tap + when you prepare a batch. Negative = extra stock available.</p>
-                {Object.keys(prepared).length > 0 && (
-                  <button onClick={() => setPrepared({})} className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1">
-                    <RotateCcw size={12} /> Reset All
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {batchItems.map(item => (
-                  <div key={item.name}
-                    className={cn("bg-card border rounded-2xl p-5 space-y-4",
-                      item.remaining < 0 ? "border-green-500/40 bg-green-500/5" :
-                      item.remaining === 0 ? "border-muted bg-secondary/30" :
-                      item.remaining <= 3 ? "border-amber-500/40 bg-amber-500/5" : "border-card-border")}>
-                    <div>
-                      <p className="font-bold text-foreground text-base leading-snug">{item.name}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Needed: {item.needed}</p>
-                    </div>
-                    <div className="text-center py-2">
-                      <p className={cn("text-6xl font-black tabular-nums",
-                        item.remaining < 0 ? "text-green-400" :
-                        item.remaining === 0 ? "text-muted-foreground" :
-                        item.remaining <= 3 ? "text-amber-400" : "text-foreground")}>
-                        {item.remaining < 0 ? `+${Math.abs(item.remaining)}` : item.remaining}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {item.remaining < 0 ? "extra stock" : item.remaining === 0 ? "all prepared ✓" : "still needed"}
-                      </p>
-                    </div>
-                    {item.preparedCount > 0 && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Prepared</span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-primary">{item.preparedCount}</span>
-                          <button onClick={() => resetPrepared(item.name)} className="text-muted-foreground hover:text-destructive">
-                            <RotateCcw size={12} />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-3 gap-2">
-                      <button onClick={() => adjustPrepared(item.name, -1)}
-                        className="py-3 rounded-xl bg-secondary hover:bg-muted text-foreground font-bold text-lg flex items-center justify-center transition-colors">
-                        <Minus size={16} />
-                      </button>
-                      <button onClick={() => adjustPrepared(item.name, item.remaining > 0 ? item.remaining : 1)}
-                        className="py-3 rounded-xl bg-primary/20 hover:bg-primary/30 text-primary font-bold text-xs flex items-center justify-center transition-colors">
-                        Batch
-                      </button>
-                      <button onClick={() => adjustPrepared(item.name, 1)}
-                        className="py-3 rounded-xl bg-primary hover:opacity-90 text-primary-foreground font-bold text-lg flex items-center justify-center transition-colors">
-                        <Plus size={16} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ── ORDERS VIEW ── */}
-      {viewMode === "orders" && (
-        <>
-          {/* Prep summary */}
-          {batchItems.length > 0 && (
-            <div className="bg-amber-500/8 border border-amber-500/25 rounded-xl overflow-hidden">
-              <button onClick={() => setPrepOpen(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 text-left">
-                <div className="flex items-center gap-2">
-                  <ClipboardList size={16} className="text-amber-400" />
-                  <span className="font-bold text-sm text-amber-400">
-                    Prep List — {activeOrders.length} active order{activeOrders.length !== 1 ? "s" : ""}
-                  </span>
-                </div>
-                {prepOpen ? <ChevronUp size={15} className="text-amber-400" /> : <ChevronDown size={15} className="text-amber-400" />}
-              </button>
-              {prepOpen && (
-                <div className="px-4 pb-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                  {batchItems.map(item => (
-                    <div key={item.name} className="bg-background/60 border border-amber-500/20 rounded-lg px-3 py-2.5 flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-foreground leading-tight truncate">{item.name}</span>
-                      <span className="text-xl font-bold text-amber-400 shrink-0">×{item.needed}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {orders.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-              <Clock size={48} className="mb-4 opacity-40" />
-              <p className="text-lg font-medium">No active orders</p>
-              <p className="text-sm">Waiting for new orders...</p>
-            </div>
-          )}
-
-          {approved.length > 0 && (
-            <Section title="Approved — Ready to Cook" count={approved.length} color="text-violet-400">
-              {approved.map(order => (
-                <OrderCard key={order.id} order={order} countdown={countdowns[order.id] ?? ""}
-                  statusColor="border-violet-500/40 bg-violet-500/5"
-                  onPrepare={() => changeStatus(order.id, "preparing")}
-                  onCancelRequest={() => setConfirm({ orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName })}
-                  showPrepare />
-              ))}
-            </Section>
-          )}
-
-          {preparing.length > 0 && (
-            <Section title="Preparing" count={preparing.length} color="text-blue-400">
-              {preparing.map(order => (
-                <OrderCard key={order.id} order={order} countdown={countdowns[order.id] ?? ""}
-                  statusColor="border-blue-500/40 bg-blue-500/5"
-                  onReady={() => changeStatus(order.id, "ready")}
-                  onCancelRequest={() => setConfirm({ orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName })}
-                  showReady />
-              ))}
-            </Section>
-          )}
-
-          {ready.length > 0 && (
-            <Section title="Ready for Pickup" count={ready.length} color="text-green-400">
-              {ready.map(order => (
-                <OrderCard key={order.id} order={order} countdown={countdowns[order.id] ?? ""}
-                  statusColor="border-green-500/40 bg-green-500/5"
-                  onComplete={() => changeStatus(order.id, "completed")}
-                  showComplete />
-              ))}
-            </Section>
-          )}
-        </>
-      )}
-
-      {/* Cancel modal */}
-      {confirm && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-          <div className="bg-card border border-card-border rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-destructive/15 flex items-center justify-center shrink-0">
-                <AlertTriangle size={20} className="text-destructive" />
-              </div>
-              <div>
-                <h3 className="font-bold text-foreground text-lg">Cancel this order?</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  <span className="font-mono text-xs">{confirm.orderNumber}</span> — {confirm.customerName}
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2 pt-1">
-              <button onClick={() => setConfirm(null)}
-                className="flex-1 py-3 rounded-xl bg-secondary text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5">
-                <X size={14} /> Keep
-              </button>
-              <button onClick={() => { changeStatus(confirm.orderId, "cancelled"); setConfirm(null); }} disabled={updateStatus.isPending}
-                className="flex-1 py-3 rounded-xl bg-destructive text-white text-sm font-bold hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1.5">
-                <Trash2 size={14} /> Cancel Order
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Section({ title, count, color, children }: { title: string; count: number; color: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <h2 className={cn("text-lg font-bold mb-3", color)}>
-        {title} <span className="text-muted-foreground font-normal text-sm">({count})</span>
-      </h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">{children}</div>
-    </div>
-  );
-}
-
-type OrderType = ListOrdersQueryResult[number];
-
-function OrderCard({
-  order, countdown, statusColor,
-  onPrepare, onReady, onComplete, onCancelRequest,
-  showPrepare, showReady, showComplete,
-}: {
-  order: OrderType; countdown: string; statusColor: string;
-  onPrepare?: () => void; onReady?: () => void; onComplete?: () => void; onCancelRequest?: () => void;
-  showPrepare?: boolean; showReady?: boolean; showComplete?: boolean;
-}) {
-  const isOverdue = countdown === "Overdue";
-  const hasTakeaway = order.items.some(i => i.itemOrderType === "takeaway");
-
-  return (
-    <div className={cn("border rounded-xl p-4 space-y-3", statusColor, isOverdue && "border-red-500/50 bg-red-500/5")}>
-      <div className="flex items-start justify-between">
-        <div>
-          <span className="font-mono text-xs text-muted-foreground">{order.orderNumber}</span>
-          <p className="text-xl font-bold text-foreground mt-0.5">{order.customerName}</p>
-          {order.customerPhone && (
-            <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
-              <Phone size={11} /> {order.customerPhone}
+          <div>
+            <h1 className="text-lg font-bold text-foreground leading-tight">Kitchen Display</h1>
+            <p className="text-xs text-muted-foreground">
+              Current Active Orders:&nbsp;
+              <span className="font-bold text-foreground">{orders.length}</span>
             </p>
-          )}
-          <p className="text-xs text-muted-foreground capitalize mt-0.5">{order.orderType.replace("_", " ")}</p>
-        </div>
-        <div className="text-right">
-          <div className={cn("text-lg font-bold tabular-nums", isOverdue ? "text-red-400" : "text-primary")}>
-            {countdown}
           </div>
-          <p className="text-xs text-muted-foreground">{formatTime(order.createdAt)}</p>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+          Live
         </div>
       </div>
 
-      {hasTakeaway && (
-        <div className="flex items-center gap-1.5 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-lg px-2.5 py-1.5">
-          <ShoppingBag size={11} /> Packing needed
+      {isLoading ? (
+        <div className="flex items-center justify-center py-24">
+          <RefreshCw className="animate-spin text-primary" size={28} />
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
+          <Clock size={48} className="mb-4 opacity-30" />
+          <p className="text-lg font-medium">No active orders</p>
+          <p className="text-sm">Waiting for new orders…</p>
+        </div>
+      ) : (
+        /* Two-column split: Dine In | Takeaway */
+        <div className="grid grid-cols-1 md:grid-cols-2 min-h-[calc(100vh-72px)]">
+
+          {/* ── Dine In ─────────────────────────────────── */}
+          <div className="border-r border-border p-4 space-y-3">
+            <div className="flex items-center gap-2 pb-1">
+              <UtensilsCrossed size={15} className="text-primary" />
+              <h2 className="font-bold text-base text-foreground">Dine In</h2>
+              <span className="ml-auto text-xs font-semibold bg-primary/15 text-primary px-2.5 py-0.5 rounded-full border border-primary/25">
+                {dineIn.length}
+              </span>
+            </div>
+
+            {dineIn.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/50">
+                <UtensilsCrossed size={32} className="mb-2" />
+                <p className="text-sm">No dine-in orders</p>
+              </div>
+            ) : (
+              dineIn.map(order => (
+                <KitchenCard
+                  key={order.id}
+                  order={order}
+                  onPrepare={() => changeStatus(order.id, "preparing")}
+                  onReady={() => changeStatus(order.id, "ready")}
+                />
+              ))
+            )}
+          </div>
+
+          {/* ── Takeaway ────────────────────────────────── */}
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-2 pb-1">
+              <ShoppingBag size={15} className="text-blue-400" />
+              <h2 className="font-bold text-base text-foreground">Takeaway</h2>
+              <span className="ml-auto text-xs font-semibold bg-blue-500/15 text-blue-400 px-2.5 py-0.5 rounded-full border border-blue-500/25">
+                {takeaway.length}
+              </span>
+            </div>
+
+            {takeaway.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/50">
+                <ShoppingBag size={32} className="mb-2" />
+                <p className="text-sm">No takeaway orders</p>
+              </div>
+            ) : (
+              takeaway.map(order => (
+                <KitchenCard
+                  key={order.id}
+                  order={order}
+                  onPrepare={() => changeStatus(order.id, "preparing")}
+                  onReady={() => changeStatus(order.id, "ready")}
+                />
+              ))
+            )}
+          </div>
+
         </div>
       )}
+    </div>
+  );
+}
 
-      <div className="space-y-1.5 border-t border-border/40 pt-3">
+function KitchenCard({
+  order,
+  onPrepare,
+  onReady,
+}: {
+  order: Order;
+  onPrepare: () => void;
+  onReady: () => void;
+}) {
+  const meta = STATUS_META[order.status] ?? STATUS_META.approved;
+
+  return (
+    <div
+      className={cn(
+        "border rounded-2xl p-4 space-y-3 transition-all",
+        meta.cardBorder,
+        order.priority && "ring-2 ring-amber-500/40"
+      )}
+    >
+      {/* Top row: status badge + order number + elapsed */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {order.priority && (
+          <span className="flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-full">
+            <Zap size={11} fill="currentColor" /> PRIORITY
+          </span>
+        )}
+        <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full border", meta.badge)}>
+          {meta.label}
+        </span>
+        <span className="font-mono text-xs text-muted-foreground">{order.orderNumber}</span>
+        <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+          <Clock size={11} />
+          {elapsed(order.createdAt)}
+        </span>
+      </div>
+
+      {/* Customer name + order type */}
+      <div>
+        <p className="text-2xl font-black text-foreground leading-tight tracking-tight">
+          {order.customerName}
+        </p>
+        <p className="text-xs text-muted-foreground mt-0.5 capitalize">
+          {order.orderType === "dine_in" ? "Dine In" :
+           order.orderType === "takeaway" ? "Takeaway" : "Delivery"}
+        </p>
+      </div>
+
+      {/* Items */}
+      <div className="space-y-1 border-t border-border/40 pt-3">
         {order.items.map(item => (
-          <div key={item.id} className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-base font-medium text-foreground truncate">{item.productName}</span>
-              {item.itemOrderType === "takeaway" && <ShoppingBag size={11} className="text-blue-400 shrink-0" />}
-            </div>
-            <span className="text-lg font-bold text-primary ml-3 shrink-0">×{item.quantity}</span>
+          <div key={item.id} className="flex items-baseline justify-between gap-2">
+            <span className="text-base font-medium text-foreground leading-snug">
+              {item.productName}
+            </span>
+            <span className="text-xl font-black text-primary shrink-0">×{item.quantity}</span>
           </div>
         ))}
       </div>
 
+      {/* Notes */}
       {order.notes && (
         <div className="text-sm text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2 border border-amber-500/20">
-          {order.notes}
+          📝 {order.notes}
         </div>
       )}
 
-      {/* Payment badge */}
-      {(() => {
-        const p = order.payment;
-        if (!p) return (
-          <div className="text-xs px-2.5 py-1.5 rounded-lg font-medium w-fit bg-red-500/15 text-red-400 border border-red-500/20">
-            ₹{order.totalAmount} — UNPAID
-          </div>
-        );
-        if (p.status === "paid") return (
-          <div className="text-xs px-2.5 py-1.5 rounded-lg font-medium w-fit bg-green-500/15 text-green-400 border border-green-500/20">
-            ✓ PAID
-          </div>
-        );
-        return (
-          <div className="text-xs px-2.5 py-1.5 rounded-lg font-medium w-fit bg-amber-500/15 text-amber-400 border border-amber-500/20">
-            Partial — ₹{p.balance?.toFixed(0)} pending
-          </div>
-        );
-      })()}
-
-      <div className="flex gap-2 pt-1">
-        {showPrepare && (
-          <button onClick={onPrepare} className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-semibold transition-colors">
+      {/* Action buttons — kitchen only does Prepare & Ready */}
+      <div className="pt-1">
+        {order.status === "approved" && (
+          <button
+            onClick={onPrepare}
+            className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold transition-colors"
+          >
             Start Preparing
           </button>
         )}
-        {showReady && (
-          <button onClick={onReady} className="flex-1 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-semibold transition-colors">
+        {order.status === "preparing" && (
+          <button
+            onClick={onReady}
+            className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl text-sm font-bold transition-colors"
+          >
             Mark Ready
           </button>
         )}
-        {showComplete && (
-          <button onClick={onComplete} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-semibold transition-colors">
-            Completed
-          </button>
-        )}
-        {onCancelRequest && (
-          <button onClick={onCancelRequest}
-            className="px-3 py-2.5 bg-secondary hover:bg-destructive/20 text-muted-foreground hover:text-destructive rounded-lg text-sm font-medium transition-colors">
-            Cancel
-          </button>
+        {order.status === "ready" && (
+          <div className="w-full py-3 bg-green-500/10 border border-green-500/30 rounded-xl text-sm font-bold text-green-400 text-center">
+            ✓ Ready — awaiting handover
+          </div>
         )}
       </div>
     </div>
