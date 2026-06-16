@@ -44,6 +44,7 @@ import type {
   OrderItemInput,
   OrderItemUpdate,
   OrderStatusUpdate,
+  OrderTrackingResult,
   OrderUpdate,
   Payment,
   PaymentInput,
@@ -52,6 +53,8 @@ import type {
   ProductInput,
   ProductSalesItem,
   ProductUpdate,
+  PublicMenuCategory,
+  PublicStats,
   User,
   UserInput,
   UserUpdate
@@ -134,6 +137,308 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPublicMenuUrl = () => {
+
+
+
+
+  return `/api/public/menu`
+}
+
+/**
+ * @summary Active menu for customer ordering (public)
+ */
+export const getPublicMenu = async ( options?: RequestInit): Promise<PublicMenuCategory[]> => {
+
+  return customFetch<PublicMenuCategory[]>(getGetPublicMenuUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublicMenuQueryKey = () => {
+    return [
+    `/api/public/menu`
+    ] as const;
+    }
+
+
+export const getGetPublicMenuQueryOptions = <TData = Awaited<ReturnType<typeof getPublicMenu>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicMenu>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublicMenuQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicMenu>>> = ({ signal }) => getPublicMenu({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublicMenu>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublicMenuQueryResult = NonNullable<Awaited<ReturnType<typeof getPublicMenu>>>
+export type GetPublicMenuQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Active menu for customer ordering (public)
+ */
+
+export function useGetPublicMenu<TData = Awaited<ReturnType<typeof getPublicMenu>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicMenu>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublicMenuQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPublicStatsUrl = () => {
+
+
+
+
+  return `/api/public/stats`
+}
+
+/**
+ * @summary Kitchen rush stats (public)
+ */
+export const getPublicStats = async ( options?: RequestInit): Promise<PublicStats> => {
+
+  return customFetch<PublicStats>(getGetPublicStatsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublicStatsQueryKey = () => {
+    return [
+    `/api/public/stats`
+    ] as const;
+    }
+
+
+export const getGetPublicStatsQueryOptions = <TData = Awaited<ReturnType<typeof getPublicStats>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublicStatsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicStats>>> = ({ signal }) => getPublicStats({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublicStats>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublicStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getPublicStats>>>
+export type GetPublicStatsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Kitchen rush stats (public)
+ */
+
+export function useGetPublicStats<TData = Awaited<ReturnType<typeof getPublicStats>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublicStatsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreatePublicOrderUrl = () => {
+
+
+
+
+  return `/api/public/orders`
+}
+
+/**
+ * @summary Customer self-order (public)
+ */
+export const createPublicOrder = async (orderInput: OrderInput, options?: RequestInit): Promise<OrderTrackingResult> => {
+
+  return customFetch<OrderTrackingResult>(getCreatePublicOrderUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      orderInput,)
+  }
+);}
+
+
+
+
+export const getCreatePublicOrderMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPublicOrder>>, TError,{data: BodyType<OrderInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPublicOrder>>, TError,{data: BodyType<OrderInput>}, TContext> => {
+
+const mutationKey = ['createPublicOrder'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPublicOrder>>, {data: BodyType<OrderInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPublicOrder(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePublicOrderMutationResult = NonNullable<Awaited<ReturnType<typeof createPublicOrder>>>
+    export type CreatePublicOrderMutationBody = BodyType<OrderInput>
+    export type CreatePublicOrderMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Customer self-order (public)
+ */
+export const useCreatePublicOrder = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPublicOrder>>, TError,{data: BodyType<OrderInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPublicOrder>>,
+        TError,
+        {data: BodyType<OrderInput>},
+        TContext
+      > => {
+      return useMutation(getCreatePublicOrderMutationOptions(options));
+    }
+
+export const getTrackPublicOrderUrl = (orderNumber: string,) => {
+
+
+
+
+  return `/api/public/orders/${orderNumber}`
+}
+
+/**
+ * @summary Track order by order number (public)
+ */
+export const trackPublicOrder = async (orderNumber: string, options?: RequestInit): Promise<OrderTrackingResult> => {
+
+  return customFetch<OrderTrackingResult>(getTrackPublicOrderUrl(orderNumber),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getTrackPublicOrderQueryKey = (orderNumber: string,) => {
+    return [
+    `/api/public/orders/${orderNumber}`
+    ] as const;
+    }
+
+
+export const getTrackPublicOrderQueryOptions = <TData = Awaited<ReturnType<typeof trackPublicOrder>>, TError = ErrorType<unknown>>(orderNumber: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof trackPublicOrder>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getTrackPublicOrderQueryKey(orderNumber);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof trackPublicOrder>>> = ({ signal }) => trackPublicOrder(orderNumber, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(orderNumber), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof trackPublicOrder>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type TrackPublicOrderQueryResult = NonNullable<Awaited<ReturnType<typeof trackPublicOrder>>>
+export type TrackPublicOrderQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Track order by order number (public)
+ */
+
+export function useTrackPublicOrder<TData = Awaited<ReturnType<typeof trackPublicOrder>>, TError = ErrorType<unknown>>(
+ orderNumber: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof trackPublicOrder>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getTrackPublicOrderQueryOptions(orderNumber,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

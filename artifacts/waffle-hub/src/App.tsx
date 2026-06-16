@@ -14,6 +14,8 @@ import MenuManager from "@/pages/MenuManager";
 import Admin from "@/pages/Admin";
 import Login from "@/pages/Login";
 import Queue from "@/pages/Queue";
+import CustomerOrder from "@/pages/CustomerOrder";
+import CustomerTrack from "@/pages/CustomerTrack";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useEffect } from "react";
 
@@ -95,46 +97,57 @@ function LoginRoute() {
 
 function Router() {
   return (
-    <Layout>
-      <Switch>
-        <Route path="/login" component={LoginRoute} />
+    <Switch>
+      {/* ── Public customer-facing routes (no auth, no sidebar) ── */}
+      <Route path="/order" component={CustomerOrder} />
+      <Route path="/track/:orderNumber" component={CustomerTrack} />
 
-        <Route path="/">
-          {() => <ProtectedRoute component={Counter} roles={["admin", "counter"]} />}
-        </Route>
-        <Route path="/queue">
-          {() => <ProtectedRoute component={Queue} roles={["admin", "counter"]} />}
-        </Route>
-        <Route path="/billing/:id">
-          {() => <ProtectedRoute component={Billing} roles={["admin", "counter"]} />}
-        </Route>
-        <Route path="/expenses">
-          {() => <ProtectedRoute component={Expenses} roles={["admin", "counter"]} />}
-        </Route>
+      {/* ── Staff routes (wrapped in Layout + auth) ── */}
+      <Route>
+        {() => (
+          <Layout>
+            <Switch>
+              <Route path="/login" component={LoginRoute} />
 
-        <Route path="/kitchen">
-          {() => <ProtectedRoute component={Kitchen} roles={["admin", "counter", "kitchen"]} />}
-        </Route>
+              <Route path="/">
+                {() => <ProtectedRoute component={Counter} roles={["admin", "counter"]} />}
+              </Route>
+              <Route path="/queue">
+                {() => <ProtectedRoute component={Queue} roles={["admin", "counter"]} />}
+              </Route>
+              <Route path="/billing/:id">
+                {() => <ProtectedRoute component={Billing} roles={["admin", "counter"]} />}
+              </Route>
+              <Route path="/expenses">
+                {() => <ProtectedRoute component={Expenses} roles={["admin", "counter"]} />}
+              </Route>
 
-        <Route path="/dashboard">
-          {() => <ProtectedRoute component={Dashboard} roles={["admin"]} />}
-        </Route>
-        <Route path="/customers">
-          {() => <ProtectedRoute component={Customers} roles={["admin"]} />}
-        </Route>
-        <Route path="/reports">
-          {() => <ProtectedRoute component={Reports} roles={["admin"]} />}
-        </Route>
-        <Route path="/menu">
-          {() => <ProtectedRoute component={MenuManager} roles={["admin"]} />}
-        </Route>
-        <Route path="/admin">
-          {() => <ProtectedRoute component={Admin} roles={["admin"]} />}
-        </Route>
+              <Route path="/kitchen">
+                {() => <ProtectedRoute component={Kitchen} roles={["admin", "counter", "kitchen"]} />}
+              </Route>
 
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+              <Route path="/dashboard">
+                {() => <ProtectedRoute component={Dashboard} roles={["admin"]} />}
+              </Route>
+              <Route path="/customers">
+                {() => <ProtectedRoute component={Customers} roles={["admin"]} />}
+              </Route>
+              <Route path="/reports">
+                {() => <ProtectedRoute component={Reports} roles={["admin"]} />}
+              </Route>
+              <Route path="/menu">
+                {() => <ProtectedRoute component={MenuManager} roles={["admin"]} />}
+              </Route>
+              <Route path="/admin">
+                {() => <ProtectedRoute component={Admin} roles={["admin"]} />}
+              </Route>
+
+              <Route component={NotFound} />
+            </Switch>
+          </Layout>
+        )}
+      </Route>
+    </Switch>
   );
 }
 

@@ -9,9 +9,11 @@ import dashboardRouter from "./dashboard";
 import reportsRouter from "./reports";
 import authRouter, { seedDefaultUsers } from "./auth";
 import usersRouter from "./users";
+import publicRouter from "./public";
 
 const router: IRouter = Router();
 
+router.use(publicRouter);
 router.use(authRouter);
 router.use(healthRouter);
 router.use(categoriesRouter);

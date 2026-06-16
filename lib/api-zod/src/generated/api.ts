@@ -17,6 +17,87 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Active menu for customer ordering (public)
+ */
+export const GetPublicMenuResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "displayOrder": zod.number(),
+  "products": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "price": zod.number()
+}))
+})
+export const GetPublicMenuResponse = zod.array(GetPublicMenuResponseItem)
+
+
+/**
+ * @summary Kitchen rush stats (public)
+ */
+export const GetPublicStatsResponse = zod.object({
+  "preparing": zod.number(),
+  "rushLevel": zod.string()
+})
+
+
+/**
+ * @summary Customer self-order (public)
+ */
+
+
+
+
+
+export const CreatePublicOrderBody = zod.object({
+  "customerName": zod.string().min(1),
+  "customerPhone": zod.string().optional(),
+  "customerId": zod.number().nullish(),
+  "orderType": zod.string(),
+  "notes": zod.string().optional(),
+  "items": zod.array(zod.object({
+  "productId": zod.number().nullish(),
+  "productName": zod.string().min(1),
+  "price": zod.number(),
+  "quantity": zod.number().min(1),
+  "itemOrderType": zod.string().optional(),
+  "notes": zod.string().optional()
+})).optional()
+})
+
+
+/**
+ * @summary Track order by order number (public)
+ */
+export const TrackPublicOrderParams = zod.object({
+  "orderNumber": zod.coerce.string()
+})
+
+export const TrackPublicOrderResponse = zod.object({
+  "id": zod.number(),
+  "orderNumber": zod.string(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string().nullish(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "totalAmount": zod.number(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "productId": zod.number().nullish(),
+  "productName": zod.string(),
+  "price": zod.number(),
+  "quantity": zod.number(),
+  "itemOrderType": zod.string(),
+  "notes": zod.string().nullish()
+}))
+})
+
+
+/**
  * @summary List all categories
  */
 export const ListCategoriesResponseItem = zod.object({

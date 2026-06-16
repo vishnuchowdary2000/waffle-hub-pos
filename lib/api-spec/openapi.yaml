@@ -17,6 +17,7 @@ tags:
   - name: reports
   - name: dashboard
   - name: users
+  - name: public
 
 paths:
   /healthz:
@@ -31,6 +32,73 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── Public (no auth) ────────────────────────────────────────────────────────
+  /public/menu:
+    get:
+      operationId: getPublicMenu
+      tags: [public]
+      summary: Active menu for customer ordering (public)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PublicMenuCategory"
+
+  /public/stats:
+    get:
+      operationId: getPublicStats
+      tags: [public]
+      summary: Kitchen rush stats (public)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicStats"
+
+  /public/orders:
+    post:
+      operationId: createPublicOrder
+      tags: [public]
+      summary: Customer self-order (public)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderTrackingResult"
+
+  /public/orders/{orderNumber}:
+    get:
+      operationId: trackPublicOrder
+      tags: [public]
+      summary: Track order by order number (public)
+      parameters:
+        - name: orderNumber
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderTrackingResult"
 
   # ── Categories ──────────────────────────────────────────────────────────────
   /categories:
@@ -1035,3 +1103,50 @@ components:
         role:        { type: string }
         displayName: { type: ["string", "null"] }
         active:      { type: boolean }
+
+    # ── Public ────────────────────────────────────────────────────────────────
+    PublicMenuProduct:
+      type: object
+      required: [id, name, price]
+      properties:
+        id:          { type: integer }
+        name:        { type: string }
+        description: { type: ["string", "null"] }
+        price:       { type: number }
+
+    PublicMenuCategory:
+      type: object
+      required: [id, name, displayOrder, products]
+      properties:
+        id:           { type: integer }
+        name:         { type: string }
+        displayOrder: { type: integer }
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicMenuProduct"
+
+    PublicStats:
+      type: object
+      required: [preparing, rushLevel]
+      properties:
+        preparing: { type: integer }
+        rushLevel: { type: string }
+
+    OrderTrackingResult:
+      type: object
+      required: [id, orderNumber, customerName, orderType, status, totalAmount, createdAt, items]
+      properties:
+        id:            { type: integer }
+        orderNumber:   { type: string }
+        customerName:  { type: string }
+        customerPhone: { type: ["string", "null"] }
+        orderType:     { type: string }
+        status:        { type: string }
+        totalAmount:   { type: number }
+        notes:         { type: ["string", "null"] }
+        createdAt:     { type: string }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"

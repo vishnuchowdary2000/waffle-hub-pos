@@ -287,6 +287,41 @@ export interface UserUpdate {
   active?: boolean;
 }
 
+export interface PublicMenuProduct {
+  id: number;
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  price: number;
+}
+
+export interface PublicMenuCategory {
+  id: number;
+  name: string;
+  displayOrder: number;
+  products: PublicMenuProduct[];
+}
+
+export interface PublicStats {
+  preparing: number;
+  rushLevel: string;
+}
+
+export interface OrderTrackingResult {
+  id: number;
+  orderNumber: string;
+  customerName: string;
+  /** @nullable */
+  customerPhone?: string | null;
+  orderType: string;
+  status: string;
+  totalAmount: number;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+  items: OrderItem[];
+}
+
 export type ListProductsParams = {
 categoryId?: number;
 active?: boolean;
