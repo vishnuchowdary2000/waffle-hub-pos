@@ -7,9 +7,12 @@ import expensesRouter from "./expenses";
 import ordersRouter from "./orders";
 import dashboardRouter from "./dashboard";
 import reportsRouter from "./reports";
+import authRouter, { seedDefaultUsers } from "./auth";
+import usersRouter from "./users";
 
 const router: IRouter = Router();
 
+router.use(authRouter);
 router.use(healthRouter);
 router.use(categoriesRouter);
 router.use(productsRouter);
@@ -18,5 +21,8 @@ router.use(expensesRouter);
 router.use(ordersRouter);
 router.use(dashboardRouter);
 router.use(reportsRouter);
+router.use(usersRouter);
+
+void seedDefaultUsers();
 
 export default router;

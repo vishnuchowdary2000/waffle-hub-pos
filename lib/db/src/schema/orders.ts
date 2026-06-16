@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, numeric } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, numeric, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -11,6 +11,7 @@ export const ordersTable = pgTable("orders", {
   orderType: text("order_type").notNull().default("dine_in"),
   status: text("status").notNull().default("pending_payment"),
   notes: text("notes"),
+  priority: boolean("priority").notNull().default(false),
   totalAmount: numeric("total_amount", { precision: 10, scale: 2 }).notNull().default("0"),
   readyTime: timestamp("ready_time", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -20,6 +20,7 @@ export interface Order {
   status: string;
   /** @nullable */
   notes?: string | null;
+  priority?: boolean;
   totalAmount: number;
   createdAt: string;
   readyTime: string;

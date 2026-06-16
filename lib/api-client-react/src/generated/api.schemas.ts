@@ -106,6 +106,7 @@ export interface Order {
   status: string;
   /** @nullable */
   notes?: string | null;
+  priority?: boolean;
   totalAmount: number;
   createdAt: string;
   readyTime: string;
@@ -143,6 +144,7 @@ export interface OrderUpdate {
   orderType?: string;
   /** @nullable */
   notes?: string | null;
+  priority?: boolean;
 }
 
 export interface OrderStatusUpdate {
@@ -255,6 +257,34 @@ export interface ProductSalesItem {
   productName: string;
   totalQuantity: number;
   totalRevenue: number;
+}
+
+export interface User {
+  id: number;
+  username: string;
+  role: string;
+  /** @nullable */
+  displayName?: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface UserInput {
+  /** @minLength 1 */
+  username: string;
+  /** @minLength 4 */
+  password: string;
+  role: string;
+  displayName?: string;
+}
+
+export interface UserUpdate {
+  username?: string;
+  password?: string;
+  role?: string;
+  /** @nullable */
+  displayName?: string | null;
+  active?: boolean;
 }
 
 export type ListProductsParams = {

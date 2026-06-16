@@ -38,3 +38,6 @@ export * from './product';
 export * from './productInput';
 export * from './productSalesItem';
 export * from './productUpdate';
+export * from './user';
+export * from './userInput';
+export * from './userUpdate';

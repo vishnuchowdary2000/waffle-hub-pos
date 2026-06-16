@@ -7,10 +7,15 @@ import {
   useDeleteExpense,
   useGetDailyReport,
   useGetProductReport,
+  useListUsers,
+  useCreateUser,
+  useUpdateUser,
+  useDeleteUser,
   getListCustomersQueryKey,
   getListExpensesQueryKey,
   getGetDailyReportQueryKey,
   getGetProductReportQueryKey,
+  getListUsersQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -20,12 +25,19 @@ import {
   Trash2, Search, AlertTriangle, X,
   Plus, RefreshCw, Eraser,
   TrendingUp, TrendingDown, ShieldCheck,
+  UserCog, KeyRound, ToggleLeft, ToggleRight, ChefHat, ShoppingBag,
 } from "lucide-react";
 
-type Tab = "customers" | "expenses" | "reports";
+type Tab = "customers" | "expenses" | "reports" | "users";
+
+const ROLE_META: Record<string, { label: string; color: string; icon: React.ElementType }> = {
+  admin:   { label: "Admin",   color: "text-amber-400 bg-amber-500/10 border-amber-500/30",   icon: ShieldCheck },
+  counter: { label: "Counter", color: "text-blue-400 bg-blue-500/10 border-blue-500/30",     icon: ShoppingBag },
+  kitchen: { label: "Kitchen", color: "text-green-400 bg-green-500/10 border-green-500/30",  icon: ChefHat },
+};
 
 export default function Admin() {
-  const [tab, setTab] = useState<Tab>("customers");
+  const [tab, setTab] = useState<Tab>("users");
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -37,11 +49,12 @@ export default function Admin() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-foreground">Admin Panel</h1>
-            <p className="text-xs text-muted-foreground">Manage customers, expenses and reports</p>
+            <p className="text-xs text-muted-foreground">User management, customers, expenses & reports</p>
           </div>
         </div>
-        <div className="flex gap-1">
-          {([ 
+        <div className="flex gap-1 overflow-x-auto">
+          {([
+            { key: "users",     label: "Users",     icon: UserCog },
             { key: "customers", label: "Customers", icon: Users },
             { key: "expenses",  label: "Expenses",  icon: Receipt },
             { key: "reports",   label: "Reports",   icon: BarChart3 },
@@ -50,7 +63,7 @@ export default function Admin() {
               key={key}
               onClick={() => setTab(key)}
               className={cn(
-                "flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors",
+                "flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors whitespace-nowrap",
                 tab === key
                   ? "text-primary border-primary bg-primary/5"
                   : "text-muted-foreground border-transparent hover:text-foreground"
@@ -64,6 +77,7 @@ export default function Admin() {
 
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto">
+        {tab === "users"     && <UsersTab />}
         {tab === "customers" && <CustomersTab />}
         {tab === "expenses"  && <ExpensesTab />}
         {tab === "reports"   && <ReportsTab />}
@@ -438,6 +452,248 @@ function ReportsTab() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ── Users Tab ───────────────────────────────────────────────────────────────── */
+
+function UsersTab() {
+  const qc = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [form, setForm] = useState({ username: "", password: "", role: "counter", displayName: "" });
+  const [editForm, setEditForm] = useState({ username: "", role: "counter", displayName: "", password: "", active: true });
+  const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
+
+  const { data: users = [], isLoading } = useListUsers({
+    query: { queryKey: getListUsersQueryKey() },
+  });
+  const createUser = useCreateUser();
+  const updateUser = useUpdateUser();
+  const deleteUser = useDeleteUser();
+
+  const invalidate = () => void qc.invalidateQueries({ queryKey: getListUsersQueryKey() });
+
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.username || !form.password || !form.role) return;
+    createUser.mutate(
+      { data: { username: form.username.trim(), password: form.password, role: form.role, displayName: form.displayName.trim() || undefined } },
+      { onSuccess: () => { invalidate(); setShowForm(false); setForm({ username: "", password: "", role: "counter", displayName: "" }); } }
+    );
+  };
+
+  const openEdit = (user: (typeof users)[0]) => {
+    setEditId(user.id);
+    setEditForm({ username: user.username, role: user.role, displayName: user.displayName ?? "", password: "", active: user.active });
+  };
+
+  const handleEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editId) return;
+    setBusyIds(prev => new Set(prev).add(editId));
+    const updates: Record<string, unknown> = {
+      username: editForm.username.trim(),
+      role: editForm.role,
+      displayName: editForm.displayName.trim() || null,
+      active: editForm.active,
+    };
+    if (editForm.password) updates.password = editForm.password;
+    updateUser.mutate(
+      { id: editId, data: updates },
+      {
+        onSuccess: () => { invalidate(); setEditId(null); },
+        onSettled: () => setBusyIds(prev => { const s = new Set(prev); s.delete(editId!); return s; }),
+      }
+    );
+  };
+
+  const doDelete = (id: number) => {
+    setBusyIds(prev => new Set(prev).add(id));
+    setConfirmDeleteId(null);
+    deleteUser.mutate({ id }, {
+      onSuccess: invalidate,
+      onSettled: () => setBusyIds(prev => { const s = new Set(prev); s.delete(id); return s; }),
+    });
+  };
+
+  return (
+    <div className="p-4 md:p-6 space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <p className="text-xs text-muted-foreground">{users.length} user{users.length !== 1 ? "s" : ""} total</p>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-semibold"
+        >
+          <Plus size={14} /> Add User
+        </button>
+      </div>
+
+      {/* Create form */}
+      {showForm && (
+        <form onSubmit={handleCreate} className="bg-card border border-card-border rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-sm">New User</h3>
+            <button type="button" onClick={() => setShowForm(false)} className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <input required placeholder="Username *" value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
+              className="bg-background border border-input rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+            <input required placeholder="Display Name" value={form.displayName} onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))}
+              className="bg-background border border-input rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+            <input required type="password" placeholder="Password *" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+              className="bg-background border border-input rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+            <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
+              className="bg-background border border-input rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+              <option value="admin">Admin</option>
+              <option value="counter">Counter</option>
+              <option value="kitchen">Kitchen</option>
+            </select>
+          </div>
+          <button type="submit" disabled={createUser.isPending}
+            className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold disabled:opacity-50">
+            {createUser.isPending ? "Creating..." : "Create User"}
+          </button>
+        </form>
+      )}
+
+      {/* User list */}
+      {isLoading ? (
+        <div className="flex justify-center py-12"><RefreshCw className="animate-spin text-primary" size={24} /></div>
+      ) : (
+        <div className="space-y-2">
+          {users.map(user => {
+            const meta = ROLE_META[user.role];
+            const RoleIcon = meta?.icon ?? ShieldCheck;
+            const isBusy = busyIds.has(user.id);
+            const isEditing = editId === user.id;
+
+            return (
+              <div key={user.id} className={cn("bg-card border border-card-border rounded-xl overflow-hidden", !user.active && "opacity-60")}>
+                {/* User row */}
+                <div className="px-4 py-3 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <span className="font-bold text-sm text-primary">{user.username.charAt(0).toUpperCase()}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-sm text-foreground">
+                        {user.displayName ?? user.username}
+                      </span>
+                      {user.displayName && (
+                        <span className="text-xs text-muted-foreground">@{user.username}</span>
+                      )}
+                      <span className={cn("flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium", meta?.color ?? "text-muted-foreground")}>
+                        <RoleIcon size={11} />
+                        {meta?.label ?? user.role}
+                      </span>
+                      {!user.active && (
+                        <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded-full border border-destructive/20 font-medium">Inactive</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">Added {formatDate(user.createdAt)}</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => isEditing ? setEditId(null) : openEdit(user)}
+                      disabled={isBusy}
+                      className={cn(
+                        "p-2 rounded-lg text-sm transition-colors",
+                        isEditing ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground hover:text-foreground"
+                      )}
+                      title="Edit user"
+                    >
+                      <UserCog size={14} />
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(user.id)}
+                      disabled={isBusy}
+                      className="p-2 rounded-lg bg-secondary hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                      title="Delete user"
+                    >
+                      {isBusy ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Inline edit form */}
+                {isEditing && (
+                  <form onSubmit={handleEdit} className="border-t border-border px-4 py-3 space-y-3 bg-background/30">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">Username</label>
+                        <input value={editForm.username} onChange={e => setEditForm(f => ({ ...f, username: e.target.value }))}
+                          className="w-full bg-background border border-input rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">Display Name</label>
+                        <input value={editForm.displayName} onChange={e => setEditForm(f => ({ ...f, displayName: e.target.value }))}
+                          placeholder="Optional"
+                          className="w-full bg-background border border-input rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><KeyRound size={11} /> New Password (leave blank to keep)</label>
+                        <input type="password" value={editForm.password} onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))}
+                          placeholder="••••••••"
+                          className="w-full bg-background border border-input rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">Role</label>
+                        <select value={editForm.role} onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))}
+                          className="w-full bg-background border border-input rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                          <option value="admin">Admin</option>
+                          <option value="counter">Counter</option>
+                          <option value="kitchen">Kitchen</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => setEditForm(f => ({ ...f, active: !f.active }))}
+                        className={cn(
+                          "flex items-center gap-2 text-sm font-medium transition-colors",
+                          editForm.active ? "text-green-400" : "text-muted-foreground"
+                        )}
+                      >
+                        {editForm.active ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
+                        {editForm.active ? "Active" : "Inactive"}
+                      </button>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => setEditId(null)}
+                          className="px-4 py-2 bg-secondary text-sm font-semibold text-muted-foreground hover:text-foreground rounded-lg transition-colors">
+                          Cancel
+                        </button>
+                        <button type="submit" disabled={updateUser.isPending}
+                          className="px-4 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-lg disabled:opacity-50">
+                          {updateUser.isPending ? "Saving..." : "Save Changes"}
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Delete confirm */}
+      {confirmDeleteId !== null && (
+        <ConfirmModal
+          title="Delete this user?"
+          description={
+            <>
+              <span className="font-semibold">{users.find(u => u.id === confirmDeleteId)?.username}</span> will be permanently deleted and won't be able to log in.
+            </>
+          }
+          confirmLabel="Delete User"
+          onCancel={() => setConfirmDeleteId(null)}
+          onConfirm={() => doDelete(confirmDeleteId)}
+        />
+      )}
     </div>
   );
 }

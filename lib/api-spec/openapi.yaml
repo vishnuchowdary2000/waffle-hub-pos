@@ -16,6 +16,7 @@ tags:
   - name: expenses
   - name: reports
   - name: dashboard
+  - name: users
 
 paths:
   /healthz:
@@ -598,6 +599,75 @@ paths:
         "204":
           description: Deleted
 
+  # ── Users ────────────────────────────────────────────────────────────────────
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users (admin only)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a user (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    patch:
+      operationId: updateUser
+      tags: [users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   # ── Dashboard & Reports ───────────────────────────────────────────────────────
   /dashboard:
     get:
@@ -729,6 +799,7 @@ components:
         orderType:    { type: string }
         status:       { type: string }
         notes:        { type: ["string", "null"] }
+        priority:     { type: boolean }
         totalAmount:  { type: number }
         createdAt:    { type: string }
         readyTime:    { type: string }
@@ -761,6 +832,7 @@ components:
         customerPhone: { type: string }
         orderType:     { type: string }
         notes:         { type: ["string", "null"] }
+        priority:      { type: boolean }
 
     OrderStatusUpdate:
       type: object
@@ -933,3 +1005,33 @@ components:
         productName:   { type: string }
         totalQuantity: { type: integer }
         totalRevenue:  { type: number }
+
+    # ── User ──────────────────────────────────────────────────────────────────
+    User:
+      type: object
+      required: [id, username, role, active, createdAt]
+      properties:
+        id:          { type: integer }
+        username:    { type: string }
+        role:        { type: string }
+        displayName: { type: ["string", "null"] }
+        active:      { type: boolean }
+        createdAt:   { type: string }
+
+    UserInput:
+      type: object
+      required: [username, password, role]
+      properties:
+        username:    { type: string, minLength: 1 }
+        password:    { type: string, minLength: 4 }
+        role:        { type: string }
+        displayName: { type: string }
+
+    UserUpdate:
+      type: object
+      properties:
+        username:    { type: string }
+        password:    { type: string }
+        role:        { type: string }
+        displayName: { type: ["string", "null"] }
+        active:      { type: boolean }

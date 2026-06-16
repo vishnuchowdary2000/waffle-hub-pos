@@ -6,11 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface OrderUpdate {
-  customerName?: string;
-  customerPhone?: string;
-  orderType?: string;
+export interface User {
+  id: number;
+  username: string;
+  role: string;
   /** @nullable */
-  notes?: string | null;
-  priority?: boolean;
+  displayName?: string | null;
+  active: boolean;
+  createdAt: string;
 }

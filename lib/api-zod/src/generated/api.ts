@@ -157,6 +157,7 @@ export const ListOrdersResponseItem = zod.object({
   "orderType": zod.string(),
   "status": zod.string(),
   "notes": zod.string().nullish(),
+  "priority": zod.boolean().optional(),
   "totalAmount": zod.number(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
@@ -222,6 +223,7 @@ export const GetOrderResponse = zod.object({
   "orderType": zod.string(),
   "status": zod.string(),
   "notes": zod.string().nullish(),
+  "priority": zod.boolean().optional(),
   "totalAmount": zod.number(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
@@ -259,7 +261,8 @@ export const UpdateOrderBody = zod.object({
   "customerName": zod.string().optional(),
   "customerPhone": zod.string().optional(),
   "orderType": zod.string().optional(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "priority": zod.boolean().optional()
 })
 
 export const UpdateOrderResponse = zod.object({
@@ -271,6 +274,7 @@ export const UpdateOrderResponse = zod.object({
   "orderType": zod.string(),
   "status": zod.string(),
   "notes": zod.string().nullish(),
+  "priority": zod.boolean().optional(),
   "totalAmount": zod.number(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
@@ -322,6 +326,7 @@ export const UpdateOrderStatusResponse = zod.object({
   "orderType": zod.string(),
   "status": zod.string(),
   "notes": zod.string().nullish(),
+  "priority": zod.boolean().optional(),
   "totalAmount": zod.number(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
@@ -583,6 +588,63 @@ export const DeleteExpenseParams = zod.object({
 
 
 /**
+ * @summary List all users (admin only)
+ */
+export const ListUsersResponseItem = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "role": zod.string(),
+  "displayName": zod.string().nullish(),
+  "active": zod.boolean(),
+  "createdAt": zod.string()
+})
+export const ListUsersResponse = zod.array(ListUsersResponseItem)
+
+
+/**
+ * @summary Create a user (admin only)
+ */
+
+export const createUserBodyPasswordMin = 4;
+
+
+
+export const CreateUserBody = zod.object({
+  "username": zod.string().min(1),
+  "password": zod.string().min(createUserBodyPasswordMin),
+  "role": zod.string(),
+  "displayName": zod.string().optional()
+})
+
+
+export const UpdateUserParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateUserBody = zod.object({
+  "username": zod.string().optional(),
+  "password": zod.string().optional(),
+  "role": zod.string().optional(),
+  "displayName": zod.string().nullish(),
+  "active": zod.boolean().optional()
+})
+
+export const UpdateUserResponse = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "role": zod.string(),
+  "displayName": zod.string().nullish(),
+  "active": zod.boolean(),
+  "createdAt": zod.string()
+})
+
+
+export const DeleteUserParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
  * @summary Live dashboard counts and summary
  */
 export const GetDashboardResponse = zod.object({
@@ -604,6 +666,7 @@ export const GetDashboardResponse = zod.object({
   "orderType": zod.string(),
   "status": zod.string(),
   "notes": zod.string().nullish(),
+  "priority": zod.boolean().optional(),
   "totalAmount": zod.number(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
