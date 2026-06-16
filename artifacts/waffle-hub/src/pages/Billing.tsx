@@ -14,7 +14,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatTime, STATUS_LABELS, ORDER_TYPE_LABELS } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, CheckCircle, Banknote, Smartphone, CreditCard, Phone } from "lucide-react";
+import { ArrowLeft, CheckCircle, Banknote, Smartphone, CreditCard, Phone, ShoppingBag, UtensilsCrossed } from "lucide-react";
 
 const statusClass: Record<string, string> = {
   pending_payment: "status-pending_payment",
@@ -142,6 +142,10 @@ export default function Billing() {
             <div key={item.id} className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-foreground">{item.productName}</span>
+                {item.itemOrderType === "takeaway"
+                  ? <span className="text-xs bg-blue-500/15 text-blue-400 px-1.5 py-0.5 rounded flex items-center gap-1"><ShoppingBag size={9} /> Pack</span>
+                  : <span className="text-xs bg-secondary text-muted-foreground px-1.5 py-0.5 rounded flex items-center gap-1"><UtensilsCrossed size={9} /> Dine</span>
+                }
                 {item.notes && <p className="text-xs text-muted-foreground">{item.notes}</p>}
               </div>
               <div className="text-right flex items-center gap-3">

@@ -72,8 +72,9 @@ export default function Kitchen() {
     );
   };
 
-  const dineIn   = sortOrders(orders.filter(o => o.orderType === "dine_in"));
-  const takeaway = sortOrders(orders.filter(o => o.orderType !== "dine_in"));
+  // Split by item-level types — a mixed order appears in both columns
+  const dineIn   = sortOrders(orders.filter(o => o.items.some(i => i.itemOrderType === "dine_in")));
+  const takeaway = sortOrders(orders.filter(o => o.items.some(i => i.itemOrderType !== "dine_in")));
 
   return (
     <div className="min-h-screen bg-background">
@@ -131,6 +132,7 @@ export default function Kitchen() {
                 <KitchenCard
                   key={order.id}
                   order={order}
+                  filterType="dine_in"
                   onPrepare={() => changeStatus(order.id, "preparing")}
                   onReady={() => changeStatus(order.id, "ready")}
                 />
@@ -158,6 +160,7 @@ export default function Kitchen() {
                 <KitchenCard
                   key={order.id}
                   order={order}
+                  filterType="takeaway"
                   onPrepare={() => changeStatus(order.id, "preparing")}
                   onReady={() => changeStatus(order.id, "ready")}
                 />
@@ -173,14 +176,25 @@ export default function Kitchen() {
 
 function KitchenCard({
   order,
+  filterType,
   onPrepare,
   onReady,
 }: {
   order: Order;
+  filterType: "dine_in" | "takeaway";
   onPrepare: () => void;
   onReady: () => void;
 }) {
   const meta = STATUS_META[order.status] ?? STATUS_META.approved;
+
+  // Show only items relevant to this column
+  const visibleItems = order.items.filter(item =>
+    filterType === "dine_in" ? item.itemOrderType === "dine_in" : item.itemOrderType !== "dine_in"
+  );
+
+  // Flag: this order also has items in the other column
+  const isMixed = order.items.some(i => i.itemOrderType === "dine_in") &&
+                  order.items.some(i => i.itemOrderType !== "dine_in");
 
   return (
     <div
@@ -201,26 +215,33 @@ function KitchenCard({
           {meta.label}
         </span>
         <span className="font-mono text-xs text-muted-foreground">{order.orderNumber}</span>
+        {isMixed && (
+          <span className="text-xs font-semibold text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full">
+            Mixed order
+          </span>
+        )}
         <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
           <Clock size={11} />
           {elapsed(order.createdAt)}
         </span>
       </div>
 
-      {/* Customer name + order type */}
+      {/* Customer name */}
       <div>
         <p className="text-2xl font-black text-foreground leading-tight tracking-tight">
           {order.customerName}
         </p>
-        <p className="text-xs text-muted-foreground mt-0.5 capitalize">
-          {order.orderType === "dine_in" ? "Dine In" :
-           order.orderType === "takeaway" ? "Takeaway" : "Delivery"}
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {filterType === "dine_in"
+            ? <span className="flex items-center gap-1"><UtensilsCrossed size={11} /> Dine In portion</span>
+            : <span className="flex items-center gap-1"><ShoppingBag size={11} /> Takeaway portion</span>
+          }
         </p>
       </div>
 
-      {/* Items */}
+      {/* Items — only the relevant type for this column */}
       <div className="space-y-1 border-t border-border/40 pt-3">
-        {order.items.map(item => (
+        {visibleItems.map(item => (
           <div key={item.id} className="flex items-baseline justify-between gap-2">
             <span className="text-base font-medium text-foreground leading-snug">
               {item.productName}
