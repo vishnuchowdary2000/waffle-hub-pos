@@ -142,9 +142,6 @@ export default function Billing() {
             <div key={item.id} className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-foreground">{item.productName}</span>
-                {item.itemOrderType === "takeaway" && (
-                  <span className="text-xs bg-blue-500/15 text-blue-400 px-1.5 py-0.5 rounded">Pack</span>
-                )}
                 {item.notes && <p className="text-xs text-muted-foreground">{item.notes}</p>}
               </div>
               <div className="text-right flex items-center gap-3">

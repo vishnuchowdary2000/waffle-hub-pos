@@ -10,17 +10,14 @@ import { cn } from "@/lib/utils";
 import {
   Plus, Minus, Trash2, ShoppingCart, Search,
   Banknote, Smartphone, CreditCard, Heart,
-  CheckCircle, X, UtensilsCrossed, ShoppingBag, UserRound, Clock,
+  CheckCircle, X, ShoppingBag, UserRound, Clock,
 } from "lucide-react";
-
-type ItemOrderType = "dine_in" | "takeaway";
 
 type CartItem = {
   productId: number | null;
   productName: string;
   price: number;
   quantity: number;
-  itemOrderType: ItemOrderType;
 };
 
 type PlacedOrder = {
@@ -121,8 +118,7 @@ export default function Counter() {
       if (existing >= 0) {
         return prev.map((c, i) => i === existing ? { ...c, quantity: c.quantity + 1 } : c);
       }
-      const defaultItemType: ItemOrderType = orderType === "dine_in" ? "dine_in" : "takeaway";
-      return [...prev, { productId: p.id, productName: p.name, price: p.price, quantity: 1, itemOrderType: defaultItemType }];
+      return [...prev, { productId: p.id, productName: p.name, price: p.price, quantity: 1 }];
     });
   };
 
@@ -133,10 +129,6 @@ export default function Counter() {
       if (updated[idx].quantity <= 0) updated.splice(idx, 1);
       return updated;
     });
-  };
-
-  const toggleItemType = (idx: number) => {
-    setCart(prev => prev.map((c, i) => i === idx ? { ...c, itemOrderType: c.itemOrderType === "dine_in" ? "takeaway" : "dine_in" } : c));
   };
 
   const removeItem = (idx: number) => setCart(prev => prev.filter((_, i) => i !== idx));
@@ -166,7 +158,7 @@ export default function Counter() {
           productName: c.productName,
           price: c.price,
           quantity: c.quantity,
-          itemOrderType: c.itemOrderType,
+          itemOrderType: orderType,
         })),
       },
     }, {
@@ -362,7 +354,7 @@ export default function Counter() {
             <p className="text-sm text-muted-foreground text-center py-6">Tap menu items to add</p>
           ) : (
             cart.map((item, idx) => (
-              <div key={idx} className="bg-background rounded-lg px-3 py-2.5 border border-border space-y-1.5">
+              <div key={idx} className="bg-background rounded-lg px-3 py-2.5 border border-border">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{item.productName}</p>
@@ -382,13 +374,6 @@ export default function Counter() {
                   </div>
                   <span className="text-sm font-bold text-primary shrink-0">{formatCurrency(item.price * item.quantity)}</span>
                 </div>
-                <button onClick={() => toggleItemType(idx)}
-                  className={cn("flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md transition-colors",
-                    item.itemOrderType === "takeaway"
-                      ? "bg-blue-500/15 text-blue-400 border border-blue-500/30"
-                      : "bg-secondary text-muted-foreground border border-transparent hover:border-border")}>
-                  {item.itemOrderType === "takeaway" ? <><ShoppingBag size={10} /> Takeaway</> : <><UtensilsCrossed size={10} /> Dine In</>}
-                </button>
               </div>
             ))
           )}
@@ -401,12 +386,6 @@ export default function Counter() {
             <span className="text-sm text-muted-foreground">{cart.length} item{cart.length !== 1 ? "s" : ""}</span>
             <span className="text-xl font-bold text-primary">{formatCurrency(total)}</span>
           </div>
-          {cart.some(i => i.itemOrderType === "takeaway") && (
-            <div className="flex items-center gap-1.5 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
-              <ShoppingBag size={12} />
-              <span>{cart.filter(i => i.itemOrderType === "takeaway").reduce((s, i) => s + i.quantity, 0)} item(s) need packaging</span>
-            </div>
-          )}
           <button onClick={placeOrder}
             disabled={!customerName.trim() || cart.length === 0 || createOrder.isPending}
             className="w-full py-3.5 rounded-xl text-base font-bold bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
@@ -453,7 +432,7 @@ function PaymentModal({
   const totalPaid = isCharity ? order.totalAmount : cashAmt + upiAmt + cardAmt;
   const balance = order.totalAmount - totalPaid;
   const canPayNow = isCharity || totalPaid > 0;
-  const takeawayItems = order.items.filter(i => i.itemOrderType === "takeaway");
+  const isPackaging = order.orderType === "takeaway" || order.orderType === "delivery";
 
   const handlePayNow = () => {
     if (isCharity) {
@@ -514,23 +493,16 @@ function PaymentModal({
           <div className="space-y-1.5">
             {order.items.map((item, i) => (
               <div key={i} className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-sm text-foreground truncate">{item.productName} ×{item.quantity}</span>
-                  {item.itemOrderType === "takeaway" && (
-                    <span className="shrink-0 text-xs bg-blue-500/15 text-blue-400 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
-                      <ShoppingBag size={9} /> Pack
-                    </span>
-                  )}
-                </div>
+                <span className="text-sm text-foreground truncate">{item.productName} ×{item.quantity}</span>
                 <span className="text-sm font-semibold text-primary shrink-0">{formatCurrency(item.price * item.quantity)}</span>
               </div>
             ))}
           </div>
 
-          {takeawayItems.length > 0 && (
+          {isPackaging && (
             <div className="flex items-center gap-2 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
               <ShoppingBag size={12} />
-              <span>{takeawayItems.reduce((s, i) => s + i.quantity, 0)} items need packing</span>
+              <span>All items need packing ({ORDER_TYPE_LABELS[order.orderType]})</span>
             </div>
           )}
 
