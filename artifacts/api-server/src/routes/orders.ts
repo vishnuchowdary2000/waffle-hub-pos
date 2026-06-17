@@ -286,6 +286,9 @@ router.put("/orders/:id/items", async (req, res): Promise<void> => {
   if (parsed.data.notes !== undefined) updateData.notes = parsed.data.notes;
   await db.update(ordersTable).set(updateData).where(eq(ordersTable.id, params.data.id));
 
+  // Sync payment total if a payment record exists (keeps pending amount correct)
+  await db.update(paymentsTable).set({ totalAmount: String(total) }).where(eq(paymentsTable.orderId, params.data.id));
+
   const full = await getFullOrder(params.data.id);
   res.json(full);
 });
@@ -310,6 +313,7 @@ router.patch("/orders/:id/items/:itemId", async (req, res): Promise<void> => {
   const allItems = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, params.data.id));
   const total = allItems.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0);
   await db.update(ordersTable).set({ totalAmount: String(total) }).where(eq(ordersTable.id, params.data.id));
+  await db.update(paymentsTable).set({ totalAmount: String(total) }).where(eq(paymentsTable.orderId, params.data.id));
 
   res.json({ ...item, price: Number(item.price) });
 });
@@ -325,6 +329,7 @@ router.delete("/orders/:id/items/:itemId", async (req, res): Promise<void> => {
   const allItems = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, params.data.id));
   const total = allItems.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0);
   await db.update(ordersTable).set({ totalAmount: String(total) }).where(eq(ordersTable.id, params.data.id));
+  await db.update(paymentsTable).set({ totalAmount: String(total) }).where(eq(paymentsTable.orderId, params.data.id));
 
   res.sendStatus(204);
 });

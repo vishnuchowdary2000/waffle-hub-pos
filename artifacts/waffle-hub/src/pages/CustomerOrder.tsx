@@ -17,13 +17,14 @@ import {
 } from "lucide-react";
 
 type Step = "info" | "menu" | "confirm";
-type OrderType = "dine_in" | "takeaway";
+type ItemOrderType = "dine_in" | "takeaway";
 
 interface CartItem {
   productId: number;
   productName: string;
   price: number;
   quantity: number;
+  itemOrderType: ItemOrderType;
 }
 
 const RUSH_CONFIG = {
@@ -39,23 +40,29 @@ function phoneDigitCount(value: string) {
 export default function CustomerOrder() {
   const [, navigate] = useLocation();
   const [step, setStep] = useState<Step>("info");
+
+  // Customer info
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [orderType, setOrderType] = useState<OrderType>("dine_in");
+  // Default type for new items added in menu step
+  const [defaultItemType, setDefaultItemType] = useState<ItemOrderType>("dine_in");
+
+  // Cart — each row is a product+type combination
   const [cart, setCart] = useState<CartItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
 
+  // Validation errors
   const [nameError, setNameError] = useState("");
   const [phoneError, setPhoneError] = useState("");
 
+  // Customer lookup
   const autoFilledNameRef = useRef<string | null>(null);
 
   const { data: menu = [], isLoading: menuLoading } = useGetPublicMenu();
   const { data: stats } = useGetPublicStats({
     query: { queryKey: getGetPublicStatsQueryKey(), refetchInterval: 10000 },
   });
-
   const createOrder = useCreatePublicOrder();
 
   const digits = phoneDigitCount(phone);
@@ -73,6 +80,7 @@ export default function CustomerOrder() {
     }
   );
 
+  // Auto-fill name from found customer
   useEffect(() => {
     if (customerProfile) {
       if (!name.trim() || name === autoFilledNameRef.current) {
@@ -83,12 +91,11 @@ export default function CustomerOrder() {
     }
   }, [customerProfile]);
 
+  // Clear auto-filled name if phone drops below 10 digits
   useEffect(() => {
-    if (!lookupEnabled) {
-      if (name === autoFilledNameRef.current) {
-        setName("");
-        autoFilledNameRef.current = null;
-      }
+    if (!lookupEnabled && name === autoFilledNameRef.current) {
+      setName("");
+      autoFilledNameRef.current = null;
     }
   }, [lookupEnabled]);
 
@@ -98,46 +105,81 @@ export default function CustomerOrder() {
     }
   }, [menu, activeCategory]);
 
+  // ── Cart operations ────────────────────────────────────────────────────────
+  // Add one unit using the current default type; dedup same product+type
   const addItem = (productId: number, productName: string, price: number) => {
+    const itype = defaultItemType;
     setCart(prev => {
-      const existing = prev.find(c => c.productId === productId);
-      if (existing) return prev.map(c => c.productId === productId ? { ...c, quantity: c.quantity + 1 } : c);
-      return [...prev, { productId, productName, price, quantity: 1 }];
+      const idx = prev.findIndex(c => c.productId === productId && c.itemOrderType === itype);
+      if (idx >= 0) return prev.map((c, i) => i === idx ? { ...c, quantity: c.quantity + 1 } : c);
+      return [...prev, { productId, productName, price, quantity: 1, itemOrderType: itype }];
     });
   };
 
+  // Remove one unit using default type first; fall back to any matching product
   const removeItem = (productId: number) => {
+    const itype = defaultItemType;
     setCart(prev => {
-      const existing = prev.find(c => c.productId === productId);
-      if (!existing) return prev;
-      if (existing.quantity === 1) return prev.filter(c => c.productId !== productId);
-      return prev.map(c => c.productId === productId ? { ...c, quantity: c.quantity - 1 } : c);
+      let idx = prev.findIndex(c => c.productId === productId && c.itemOrderType === itype);
+      if (idx < 0) idx = prev.findIndex(c => c.productId === productId);
+      if (idx < 0) return prev;
+      const item = prev[idx];
+      if (item.quantity === 1) return prev.filter((_, i) => i !== idx);
+      return prev.map((c, i) => i === idx ? { ...c, quantity: c.quantity - 1 } : c);
     });
   };
 
-  const removeAll = (productId: number) => setCart(prev => prev.filter(c => c.productId !== productId));
+  // Toggle a row's type (confirm step) — merges into existing row if target type exists
+  const toggleItemType = (idx: number) => {
+    setCart(prev => {
+      const item = prev[idx];
+      const newType: ItemOrderType = item.itemOrderType === "dine_in" ? "takeaway" : "dine_in";
+      const mergeIdx = prev.findIndex((c, i) => i !== idx && c.productId === item.productId && c.itemOrderType === newType);
+      if (mergeIdx >= 0) {
+        return prev
+          .map((c, i) => i === mergeIdx ? { ...c, quantity: c.quantity + item.quantity } : c)
+          .filter((_, i) => i !== idx);
+      }
+      return prev.map((c, i) => i === idx ? { ...c, itemOrderType: newType } : c);
+    });
+  };
 
-  const cartQty = (productId: number) => cart.find(c => c.productId === productId)?.quantity ?? 0;
+  const updateCartRow = (idx: number, delta: number) => {
+    setCart(prev => {
+      const item = prev[idx];
+      if (!item) return prev;
+      if (item.quantity + delta <= 0) return prev.filter((_, i) => i !== idx);
+      return prev.map((c, i) => i === idx ? { ...c, quantity: c.quantity + delta } : c);
+    });
+  };
+
+  const removeCartRow = (idx: number) => setCart(prev => prev.filter((_, i) => i !== idx));
+
+  // Total qty for a product across all types (for menu step badge)
+  const cartQty = (productId: number) =>
+    cart.filter(c => c.productId === productId).reduce((s, c) => s + c.quantity, 0);
+
   const totalItems = cart.reduce((s, c) => s + c.quantity, 0);
   const totalAmount = cart.reduce((s, c) => s + c.price * c.quantity, 0);
+  const packagingCount = cart.filter(c => c.itemOrderType === "takeaway").reduce((s, c) => s + c.quantity, 0);
 
+  // Derive top-level orderType from items
+  const derivedOrderType = (): string => {
+    const hasDI = cart.some(c => c.itemOrderType === "dine_in");
+    const hasTA = cart.some(c => c.itemOrderType === "takeaway");
+    if (hasDI && hasTA) return "mixed";
+    if (hasTA) return "takeaway";
+    return "dine_in";
+  };
+
+  // ── Step navigation ────────────────────────────────────────────────────────
   const handleContinue = () => {
     let hasError = false;
-    if (!name.trim()) {
-      setNameError("Name is required");
-      hasError = true;
-    } else {
-      setNameError("");
-    }
-    if (!phone.trim()) {
-      setPhoneError("Mobile number is required");
-      hasError = true;
-    } else if (digits < 10) {
-      setPhoneError("Enter at least 10 digits");
-      hasError = true;
-    } else {
-      setPhoneError("");
-    }
+    if (!name.trim()) { setNameError("Name is required"); hasError = true; }
+    else setNameError("");
+    if (!phone.trim()) { setPhoneError("Mobile number is required"); hasError = true; }
+    else if (digits < 10) { setPhoneError("Enter at least 10 digits"); hasError = true; }
+    else setPhoneError("");
     if (!hasError) setStep("menu");
   };
 
@@ -148,35 +190,32 @@ export default function CustomerOrder() {
           customerName: name.trim(),
           customerPhone: phone.trim(),
           customerId: customerProfile?.id,
-          orderType,
+          orderType: derivedOrderType(),
           notes: notes.trim() || undefined,
           items: cart.map(c => ({
             productId: c.productId,
             productName: c.productName,
             price: c.price,
             quantity: c.quantity,
-            itemOrderType: orderType,
+            itemOrderType: c.itemOrderType,
           })),
         },
       },
-      {
-        onSuccess: (order) => {
-          navigate(`/track/${order.orderNumber}`);
-        },
-      }
+      { onSuccess: (order) => navigate(`/track/${order.orderNumber}`) }
     );
   };
 
+  // ── Derived display ────────────────────────────────────────────────────────
   const rushLevel = (stats?.rushLevel ?? "low") as "low" | "moderate" | "high";
   const rush = RUSH_CONFIG[rushLevel];
   const activeCat = menu.find(c => c.id === activeCategory);
-
   const isReturningCustomer = lookupEnabled && !!customerProfile;
   const isNewCustomer = lookupEnabled && !lookingUp && notFound;
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* ── Header ─────────────────────────────────────────────── */}
+      {/* Header */}
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur border-b border-border px-4 py-3">
         <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
@@ -188,7 +227,6 @@ export default function CustomerOrder() {
               <p className="text-xs text-muted-foreground">Self Order</p>
             </div>
           </div>
-
           <div className="flex items-center gap-2">
             {stats && (
               <div className={cn("hidden sm:flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border", rush.bg, rush.color)}>
@@ -196,10 +234,8 @@ export default function CustomerOrder() {
               </div>
             )}
             {step === "menu" && totalItems > 0 && (
-              <button
-                onClick={() => setStep("confirm")}
-                className="flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-xl text-sm font-bold"
-              >
+              <button onClick={() => setStep("confirm")}
+                className="flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-xl text-sm font-bold">
                 <ShoppingCart size={15} />
                 {totalItems} · ₹{totalAmount}
               </button>
@@ -209,7 +245,7 @@ export default function CustomerOrder() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {/* ── Rush + stats bar ─────────────────────────────────────────────── */}
+        {/* Rush bar */}
         <div className={cn("flex items-center justify-between rounded-xl border px-4 py-3 text-sm", rush.bg)}>
           <div className="flex items-center gap-2">
             <Zap size={14} className={rush.color} />
@@ -220,7 +256,7 @@ export default function CustomerOrder() {
           </span>
         </div>
 
-        {/* ── Disclaimer ─────────────────────────────────────────────────── */}
+        {/* Disclaimer */}
         <div className="flex gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-4 py-3">
           <Clock size={15} className="text-amber-400 mt-0.5 shrink-0" />
           <p className="text-xs text-amber-400/90 leading-relaxed">
@@ -228,7 +264,7 @@ export default function CustomerOrder() {
           </p>
         </div>
 
-        {/* ── Step 1: Customer Info ─────────────────────────────────────────── */}
+        {/* ── STEP 1: Info ─────────────────────────────────────────────────── */}
         {step === "info" && (
           <div className="space-y-5">
             <div>
@@ -237,7 +273,7 @@ export default function CustomerOrder() {
             </div>
 
             <div className="space-y-4">
-              {/* Mobile Number — shown first for auto-lookup */}
+              {/* Mobile Number — first, triggers auto-lookup */}
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
                   <Phone size={12} /> Mobile Number *
@@ -245,10 +281,7 @@ export default function CustomerOrder() {
                 <div className="relative">
                   <input
                     value={phone}
-                    onChange={e => {
-                      setPhone(e.target.value);
-                      if (phoneError) setPhoneError("");
-                    }}
+                    onChange={e => { setPhone(e.target.value); if (phoneError) setPhoneError(""); }}
                     placeholder="10-digit mobile number"
                     inputMode="numeric"
                     maxLength={15}
@@ -257,7 +290,6 @@ export default function CustomerOrder() {
                       phoneError ? "border-destructive focus:ring-destructive/50" : "border-input"
                     )}
                   />
-                  {/* Status indicator inside input */}
                   <div className="absolute right-3 top-1/2 -translate-y-1/2">
                     {lookingUp && <RefreshCw size={15} className="animate-spin text-muted-foreground" />}
                     {isReturningCustomer && <CheckCircle2 size={15} className="text-green-400" />}
@@ -270,7 +302,7 @@ export default function CustomerOrder() {
                 )}
               </div>
 
-              {/* Returning customer profile card */}
+              {/* Returning customer card */}
               {isReturningCustomer && customerProfile && (
                 <div className="bg-green-500/8 border border-green-500/25 rounded-2xl px-4 py-3 space-y-2.5">
                   <div className="flex items-center gap-2">
@@ -284,14 +316,12 @@ export default function CustomerOrder() {
                       </p>
                     </div>
                   </div>
-
                   {customerProfile.favoriteItems && (
                     <div className="flex items-start gap-1.5 text-xs text-amber-400/90">
                       <Star size={11} className="mt-0.5 shrink-0 fill-amber-400" />
                       <span>Favourites: {customerProfile.favoriteItems}</span>
                     </div>
                   )}
-
                   {customerProfile.recentOrders && customerProfile.recentOrders.length > 0 && (
                     <div className="border-t border-green-500/15 pt-2 space-y-1.5">
                       <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
@@ -342,22 +372,22 @@ export default function CustomerOrder() {
                 )}
               </div>
 
-              {/* Order type */}
+              {/* Default order type (sets the starting type for new cart items) */}
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
-                  Order Type *
+                  Default Order Type
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   {([
-                    { value: "dine_in", label: "Dine In", icon: UtensilsCrossed, sub: "Eat here" },
-                    { value: "takeaway", label: "Takeaway", icon: ShoppingBag, sub: "Pack & go" },
-                  ] as const).map(opt => (
+                    { value: "dine_in"  as const, label: "Dine In",  icon: UtensilsCrossed, sub: "Eat here" },
+                    { value: "takeaway" as const, label: "Takeaway", icon: ShoppingBag,     sub: "Pack & go" },
+                  ]).map(opt => (
                     <button
                       key={opt.value}
-                      onClick={() => setOrderType(opt.value)}
+                      onClick={() => setDefaultItemType(opt.value)}
                       className={cn(
                         "flex flex-col items-center gap-2 py-5 rounded-2xl border-2 transition-all",
-                        orderType === opt.value
+                        defaultItemType === opt.value
                           ? "border-primary bg-primary/10 text-primary"
                           : "border-border bg-card text-muted-foreground hover:border-primary/50"
                       )}
@@ -370,6 +400,9 @@ export default function CustomerOrder() {
                     </button>
                   ))}
                 </div>
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  You can change individual items after adding them
+                </p>
               </div>
             </div>
 
@@ -382,7 +415,7 @@ export default function CustomerOrder() {
           </div>
         )}
 
-        {/* ── Step 2: Menu ──────────────────────────────────────────────────── */}
+        {/* ── STEP 2: Menu ──────────────────────────────────────────────────── */}
         {step === "menu" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -395,10 +428,30 @@ export default function CustomerOrder() {
               </button>
             </div>
 
+            {/* Default type pill — visible reminder */}
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Adding as:</span>
+              <button
+                onClick={() => setDefaultItemType(t => t === "dine_in" ? "takeaway" : "dine_in")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-semibold transition-colors",
+                  defaultItemType === "takeaway"
+                    ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
+                    : "bg-secondary text-foreground border-border"
+                )}
+              >
+                {defaultItemType === "takeaway"
+                  ? <><ShoppingBag size={11} /> Takeaway</>
+                  : <><UtensilsCrossed size={11} /> Dine In</>}
+              </button>
+              <span className="text-muted-foreground">(tap to switch)</span>
+            </div>
+
             {menuLoading ? (
               <div className="flex justify-center py-12"><RefreshCw className="animate-spin text-primary" size={24} /></div>
             ) : (
               <>
+                {/* Category tabs */}
                 <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
                   {menu.map(cat => (
                     <button
@@ -416,6 +469,7 @@ export default function CustomerOrder() {
                   ))}
                 </div>
 
+                {/* Products */}
                 <div className="space-y-2">
                   {activeCat?.products.map(product => {
                     const qty = cartQty(product.id);
@@ -474,7 +528,7 @@ export default function CustomerOrder() {
           </div>
         )}
 
-        {/* ── Step 3: Confirm ───────────────────────────────────────────────── */}
+        {/* ── STEP 3: Confirm ───────────────────────────────────────────────── */}
         {step === "confirm" && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
@@ -484,6 +538,7 @@ export default function CustomerOrder() {
               </button>
             </div>
 
+            {/* Customer summary */}
             <div className="bg-card border border-border rounded-2xl px-4 py-3 space-y-2">
               <div className="flex items-center gap-2 text-sm">
                 <User size={13} className="text-muted-foreground" />
@@ -495,42 +550,60 @@ export default function CustomerOrder() {
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2 text-sm">
-                {orderType === "dine_in"
-                  ? <UtensilsCrossed size={13} className="text-muted-foreground" />
-                  : <ShoppingBag size={13} className="text-muted-foreground" />}
-                <span className="text-muted-foreground">{orderType === "dine_in" ? "Dine In" : "Takeaway"}</span>
-              </div>
+              {packagingCount > 0 && (
+                <div className="flex items-center gap-1.5 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
+                  <ShoppingBag size={12} />
+                  <span>{packagingCount} item{packagingCount !== 1 ? "s" : ""} need packaging</span>
+                </div>
+              )}
             </div>
 
+            {/* Cart rows — per product+type, with toggle */}
             <div className="space-y-2">
-              {cart.map(item => (
-                <div key={item.productId} className="bg-card border border-border rounded-xl px-4 py-3 flex items-center gap-3">
-                  <div className="flex-1">
-                    <p className="font-semibold text-foreground text-sm">{item.productName}</p>
-                    <p className="text-xs text-muted-foreground">₹{item.price} each</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1.5">
-                      <button onClick={() => removeItem(item.productId)}
-                        className="w-7 h-7 rounded-lg bg-secondary flex items-center justify-center">
-                        <Minus size={12} />
-                      </button>
-                      <span className="font-bold text-foreground w-5 text-center">{item.quantity}</span>
-                      <button onClick={() => addItem(item.productId, item.productName, item.price)}
-                        className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-                        <Plus size={12} className="text-primary-foreground" />
+              {cart.map((item, idx) => (
+                <div key={`${item.productId}-${item.itemOrderType}-${idx}`} className="bg-card border border-border rounded-xl px-4 py-3 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-foreground text-sm">{item.productName}</p>
+                      <p className="text-xs text-muted-foreground">₹{item.price} each</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => updateCartRow(idx, -1)}
+                          className="w-7 h-7 rounded-lg bg-secondary flex items-center justify-center">
+                          <Minus size={12} />
+                        </button>
+                        <span className="font-bold text-foreground w-5 text-center tabular-nums">{item.quantity}</span>
+                        <button onClick={() => updateCartRow(idx, 1)}
+                          className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
+                          <Plus size={12} className="text-primary-foreground" />
+                        </button>
+                      </div>
+                      <span className="font-bold text-primary ml-1 w-16 text-right">₹{item.price * item.quantity}</span>
+                      <button onClick={() => removeCartRow(idx)} className="text-muted-foreground hover:text-destructive ml-1">
+                        <Trash2 size={13} />
                       </button>
                     </div>
-                    <span className="font-bold text-primary ml-1 w-16 text-right">₹{item.price * item.quantity}</span>
-                    <button onClick={() => removeAll(item.productId)} className="text-muted-foreground hover:text-destructive ml-1">
-                      <Trash2 size={13} />
-                    </button>
                   </div>
+                  {/* Per-item type toggle */}
+                  <button
+                    onClick={() => toggleItemType(idx)}
+                    className={cn(
+                      "flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors",
+                      item.itemOrderType === "takeaway"
+                        ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
+                        : "bg-secondary text-muted-foreground border-transparent hover:border-border"
+                    )}
+                  >
+                    {item.itemOrderType === "takeaway"
+                      ? <><ShoppingBag size={11} /> Takeaway — tap to switch to Dine In</>
+                      : <><UtensilsCrossed size={11} /> Dine In — tap to switch to Takeaway</>}
+                  </button>
                 </div>
               ))}
             </div>
 
+            {/* Special instructions */}
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
                 Special Instructions (optional)
@@ -544,11 +617,18 @@ export default function CustomerOrder() {
               />
             </div>
 
+            {/* Total */}
             <div className="bg-card border border-border rounded-2xl px-4 py-4 flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Total Amount</span>
+              <div>
+                <span className="text-sm text-muted-foreground">Total Amount</span>
+                {packagingCount > 0 && (
+                  <p className="text-xs text-blue-400 mt-0.5">{packagingCount} item{packagingCount !== 1 ? "s" : ""} need packaging</p>
+                )}
+              </div>
               <span className="text-2xl font-black text-foreground">₹{totalAmount}</span>
             </div>
 
+            {/* Pay at counter notice */}
             <div className="flex gap-3 bg-blue-500/8 border border-blue-500/20 rounded-xl px-4 py-3">
               <AlertCircle size={15} className="text-blue-400 shrink-0 mt-0.5" />
               <p className="text-xs text-blue-400/90 leading-relaxed">

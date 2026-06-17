@@ -69,4 +69,5 @@ export const ORDER_TYPE_LABELS: Record<string, string> = {
   dine_in:  "Dine In",
   takeaway: "Takeaway",
   delivery: "Delivery",
+  mixed:    "Mixed",
 };

@@ -52,9 +52,10 @@ const STATUS_META: Record<
 };
 
 const ORDER_TYPE_LABELS: Record<string, string> = {
-  dine_in: "Dine In",
+  dine_in:  "Dine In",
   takeaway: "Takeaway",
   delivery: "Delivery",
+  mixed:    "Mixed",
 };
 
 function elapsed(createdAt: string) {
