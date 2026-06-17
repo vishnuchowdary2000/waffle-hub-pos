@@ -48,14 +48,25 @@ export default function Billing() {
   const [cash, setCash] = useState("0");
   const [upi, setUpi] = useState("0");
   const [card, setCard] = useState("0");
+  const [discountType, setDiscountType] = useState<"percentage" | "fixed" | "">("");
+  const [discountValue, setDiscountValue] = useState("0");
+  const [charityPreset, setCharityPreset] = useState<number | null>(null);
+  const [charityCustom, setCharityCustom] = useState("0");
 
   useEffect(() => {
     if (existingPayment) {
       setCash(String(existingPayment.cashAmount));
       setUpi(String(existingPayment.upiAmount));
       setCard(String(existingPayment.cardAmount));
+      const dt = (existingPayment.discountType ?? "") as "percentage" | "fixed" | "";
+      setDiscountType(dt);
+      setDiscountValue(String(existingPayment.discountValue ?? 0));
+      const ca = existingPayment.charityAmount ?? 0;
+      if ([1, 2, 5, 10].includes(ca)) { setCharityPreset(ca); setCharityCustom("0"); }
+      else if (ca > 0) { setCharityPreset(-1); setCharityCustom(String(ca)); }
+      else { setCharityPreset(null); setCharityCustom("0"); }
     }
-  }, [existingPayment]);
+  }, [existingPayment?.id]);
 
   if (isLoading || !order) {
     return (
@@ -69,16 +80,28 @@ export default function Billing() {
   const cashAmt = parseFloat(cash) || 0;
   const upiAmt = parseFloat(upi) || 0;
   const cardAmt = parseFloat(card) || 0;
+  const discAmt = discountType === "percentage"
+    ? totalAmount * (parseFloat(discountValue) || 0) / 100
+    : discountType === "fixed" ? (parseFloat(discountValue) || 0) : 0;
+  const charityAmt = charityPreset === -1
+    ? (parseFloat(charityCustom) || 0)
+    : (charityPreset ?? 0);
+  const finalAmount = Math.max(0, totalAmount - discAmt + charityAmt);
   const totalPaid = cashAmt + upiAmt + cardAmt;
-  const balance = totalAmount - totalPaid;
-  const isPaid = balance <= 0;
+  const balance = finalAmount - totalPaid;
+  const isPaid = balance <= 0 && finalAmount >= 0;
 
   // Previously paid (from existing payment record)
   const alreadyPaid = existingPayment ? existingPayment.totalPaid : 0;
-  const pending = totalAmount - alreadyPaid;
+  const pending = existingPayment ? existingPayment.balance : totalAmount;
 
-  const handleSetFullCash = () => { setCash(String(totalAmount)); setUpi("0"); setCard("0"); };
-  const handleSetFullUpi = () => { setUpi(String(totalAmount)); setCash("0"); setCard("0"); };
+  const handleSetFullCash = () => { setCash(String(Math.max(0, finalAmount))); setUpi("0"); setCard("0"); };
+  const handleSetFullUpi = () => { setUpi(String(Math.max(0, finalAmount))); setCash("0"); setCard("0"); };
+
+  const payloadExtras = {
+    ...(discountType ? { discountType, discountValue: parseFloat(discountValue) || 0 } : {}),
+    charityAmount: charityAmt,
+  };
 
   const handleSave = () => {
     const afterSave = () => {
@@ -90,9 +113,8 @@ export default function Billing() {
     };
 
     if (existingPayment) {
-      updatePayment.mutate({ id: orderId, data: { cashAmount: cashAmt, upiAmount: upiAmt, cardAmount: cardAmt } }, {
+      updatePayment.mutate({ id: orderId, data: { cashAmount: cashAmt, upiAmount: upiAmt, cardAmount: cardAmt, ...payloadExtras } }, {
         onSuccess: () => {
-          // Auto-approve if still pending_payment
           if (order.status === "pending_payment") {
             updateStatus.mutate({ id: orderId, data: { status: "approved" } }, { onSuccess: afterSave });
           } else {
@@ -101,11 +123,8 @@ export default function Billing() {
         },
       });
     } else {
-      createPayment.mutate({ id: orderId, data: { totalAmount, cashAmount: cashAmt, upiAmount: upiAmt, cardAmount: cardAmt } }, {
-        onSuccess: () => {
-          // Backend auto-approves; just refresh
-          afterSave();
-        },
+      createPayment.mutate({ id: orderId, data: { totalAmount, cashAmount: cashAmt, upiAmount: upiAmt, cardAmount: cardAmt, ...payloadExtras } }, {
+        onSuccess: () => afterSave(),
       });
     }
   };
@@ -244,43 +263,160 @@ export default function Billing() {
       )}
 
       {/* Payment entry — hidden for cancelled orders */}
-      {order.status !== "cancelled" && <div className="bg-card border border-card-border rounded-xl p-5 space-y-4">
+      {order.status !== "cancelled" && <div className="bg-card border border-card-border rounded-xl p-5 space-y-5">
         <h2 className="text-base font-bold text-foreground">Collect Payment</h2>
 
-        <PaymentField
-          icon={<Banknote size={16} className="text-emerald-400" />}
-          label="Cash"
-          value={cash}
-          onChange={setCash}
-          onSetFull={handleSetFullCash}
-          color="text-emerald-400"
-        />
-        <PaymentField
-          icon={<Smartphone size={16} className="text-blue-400" />}
-          label="UPI / QR"
-          value={upi}
-          onChange={setUpi}
-          onSetFull={handleSetFullUpi}
-          color="text-blue-400"
-        />
-        <PaymentField
-          icon={<CreditCard size={16} className="text-purple-400" />}
-          label="Card"
-          value={card}
-          onChange={setCard}
-          color="text-purple-400"
-        />
+        {/* ── Discount ── */}
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Discount</span>
+            {discAmt > 0 && (
+              <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                −{formatCurrency(discAmt)}
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setDiscountType(discountType === "percentage" ? "" : "percentage")}
+              className={cn("flex-1 py-2 rounded-xl text-xs font-bold border transition-colors",
+                discountType === "percentage"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-secondary text-muted-foreground border-transparent hover:border-border")}
+            >
+              % Percentage
+            </button>
+            <button
+              onClick={() => setDiscountType(discountType === "fixed" ? "" : "fixed")}
+              className={cn("flex-1 py-2 rounded-xl text-xs font-bold border transition-colors",
+                discountType === "fixed"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-secondary text-muted-foreground border-transparent hover:border-border")}
+            >
+              ₹ Fixed Amount
+            </button>
+          </div>
+          {discountType && (
+            <input
+              type="number"
+              min="0"
+              max={discountType === "percentage" ? "100" : undefined}
+              value={discountValue}
+              onChange={e => setDiscountValue(e.target.value)}
+              placeholder={discountType === "percentage" ? "Enter % (e.g. 10)" : "Enter ₹ amount"}
+              className="w-full bg-secondary border border-input rounded-xl px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+            />
+          )}
+        </div>
 
-        {/* Live payment summary */}
+        {/* ── Charity ── */}
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Charity Contribution</span>
+            {charityAmt > 0 && (
+              <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
+                +{formatCurrency(charityAmt)}
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {[1, 2, 5, 10].map(amt => (
+              <button
+                key={amt}
+                onClick={() => { setCharityPreset(charityPreset === amt ? null : amt); setCharityCustom("0"); }}
+                className={cn("px-4 py-2 rounded-xl text-xs font-bold border transition-colors",
+                  charityPreset === amt
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-secondary text-muted-foreground border-transparent hover:border-border")}
+              >
+                ₹{amt}
+              </button>
+            ))}
+            <button
+              onClick={() => { setCharityPreset(charityPreset === -1 ? null : -1); }}
+              className={cn("px-4 py-2 rounded-xl text-xs font-bold border transition-colors",
+                charityPreset === -1
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-secondary text-muted-foreground border-transparent hover:border-border")}
+            >
+              Custom
+            </button>
+          </div>
+          {charityPreset === -1 && (
+            <input
+              type="number"
+              min="0"
+              value={charityCustom}
+              onChange={e => setCharityCustom(e.target.value)}
+              placeholder="Enter custom charity amount"
+              className="w-full bg-secondary border border-input rounded-xl px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+            />
+          )}
+        </div>
+
+        {/* ── Payment fields ── */}
+        <div className="space-y-3 border-t border-border pt-4">
+          <PaymentField
+            icon={<Banknote size={16} className="text-emerald-400" />}
+            label="Cash"
+            value={cash}
+            onChange={setCash}
+            onSetFull={handleSetFullCash}
+            color="text-emerald-400"
+          />
+          <PaymentField
+            icon={<Smartphone size={16} className="text-blue-400" />}
+            label="UPI / QR"
+            value={upi}
+            onChange={setUpi}
+            onSetFull={handleSetFullUpi}
+            color="text-blue-400"
+          />
+          <PaymentField
+            icon={<CreditCard size={16} className="text-purple-400" />}
+            label="Card"
+            value={card}
+            onChange={setCard}
+            color="text-purple-400"
+          />
+        </div>
+
+        {/* ── Payment summary ── */}
         <div className="border-t border-border pt-4 bg-secondary/40 rounded-xl p-4 space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Total Amount</span>
+            <span className="text-muted-foreground">Subtotal</span>
             <span className="font-semibold">{formatCurrency(totalAmount)}</span>
           </div>
+          {discAmt > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">
+                Discount {discountType === "percentage" ? `(${discountValue}%)` : "(Fixed)"}
+              </span>
+              <span className="font-semibold text-emerald-400">−{formatCurrency(discAmt)}</span>
+            </div>
+          )}
+          {charityAmt > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Charity</span>
+              <span className="font-semibold text-blue-400">+{formatCurrency(charityAmt)}</span>
+            </div>
+          )}
+          {(discAmt > 0 || charityAmt > 0) && (
+            <div className="flex justify-between text-sm font-bold border-t border-border/50 pt-2">
+              <span className="text-foreground">Final Amount</span>
+              <span className="text-primary">{formatCurrency(finalAmount)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Amount Paid</span>
             <span className="font-semibold text-green-400">{formatCurrency(totalPaid)}</span>
           </div>
+          {alreadyPaid > 0 && totalPaid !== alreadyPaid && (
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Previously Collected</span>
+              <span className="text-muted-foreground">{formatCurrency(alreadyPaid)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-base font-bold border-t border-border/50 pt-2">
             <span className={balance <= 0 ? "text-green-400" : "text-amber-400"}>
               {balance <= 0 ? "Change / Fully Paid" : "Pending Amount"}

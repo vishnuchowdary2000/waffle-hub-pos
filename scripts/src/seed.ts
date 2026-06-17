@@ -23,7 +23,7 @@ async function seed() {
     process.exit(0);
   }
 
-  await db.insert(productsTable).values([
+  const rawProducts: { name: string; categoryId: number; price: number; description: string; active: boolean }[] = [
     // Classic Waffles
     { name: "Plain Waffle", categoryId: classics.id, price: 60, description: "Crispy golden waffle", active: true },
     { name: "Butter Waffle", categoryId: classics.id, price: 70, description: "With fresh butter", active: true },
@@ -61,7 +61,8 @@ async function seed() {
     { name: "Waffle + Hot Choc", categoryId: combos.id, price: 110, description: "Any classic waffle + hot chocolate", active: true },
     { name: "Family Pack (4 Waffles)", categoryId: combos.id, price: 280, description: "4 classic waffles + 4 beverages", active: true },
     { name: "Date Night Combo", categoryId: combos.id, price: 250, description: "2 specialty waffles + 2 hot chocs", active: true },
-  ]).onConflictDoNothing();
+  ];
+  await db.insert(productsTable).values(rawProducts.map(v => ({ ...v, price: String(v.price) }))).onConflictDoNothing();
 
   console.log("Products seeded.");
   console.log("Done! Database seeded successfully.");

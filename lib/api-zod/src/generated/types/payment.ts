@@ -13,8 +13,14 @@ export interface Payment {
   cashAmount: number;
   upiAmount: number;
   cardAmount: number;
+  /** @nullable */
+  discountType: string | null;
+  discountValue: number;
+  discountAmount: number;
+  charityAmount: number;
+  finalAmount: number;
   totalPaid: number;
-  balance?: number;
+  balance: number;
   status: string;
   createdAt: string;
 }

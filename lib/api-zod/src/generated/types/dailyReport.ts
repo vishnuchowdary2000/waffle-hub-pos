@@ -14,6 +14,8 @@ export interface DailyReport {
   upiRevenue: number;
   cardRevenue: number;
   totalExpenses: number;
+  totalDiscount: number;
+  totalCharity: number;
   estimatedProfit: number;
   avgOrderValue: number;
   completedOrders: number;

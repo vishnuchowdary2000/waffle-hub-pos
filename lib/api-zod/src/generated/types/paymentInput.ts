@@ -11,4 +11,7 @@ export interface PaymentInput {
   cashAmount?: number;
   upiAmount?: number;
   cardAmount?: number;
+  discountType?: string;
+  discountValue?: number;
+  charityAmount?: number;
 }

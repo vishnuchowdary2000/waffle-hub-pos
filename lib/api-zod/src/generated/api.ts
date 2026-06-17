@@ -284,8 +284,13 @@ export const ListOrdersResponseItem = zod.object({
   "cashAmount": zod.number(),
   "upiAmount": zod.number(),
   "cardAmount": zod.number(),
+  "discountType": zod.string().nullable(),
+  "discountValue": zod.number(),
+  "discountAmount": zod.number(),
+  "charityAmount": zod.number(),
+  "finalAmount": zod.number(),
   "totalPaid": zod.number(),
-  "balance": zod.number().optional(),
+  "balance": zod.number(),
   "status": zod.string(),
   "createdAt": zod.string()
 }).optional()
@@ -350,8 +355,13 @@ export const GetOrderResponse = zod.object({
   "cashAmount": zod.number(),
   "upiAmount": zod.number(),
   "cardAmount": zod.number(),
+  "discountType": zod.string().nullable(),
+  "discountValue": zod.number(),
+  "discountAmount": zod.number(),
+  "charityAmount": zod.number(),
+  "finalAmount": zod.number(),
   "totalPaid": zod.number(),
-  "balance": zod.number().optional(),
+  "balance": zod.number(),
   "status": zod.string(),
   "createdAt": zod.string()
 }).optional()
@@ -401,8 +411,13 @@ export const UpdateOrderResponse = zod.object({
   "cashAmount": zod.number(),
   "upiAmount": zod.number(),
   "cardAmount": zod.number(),
+  "discountType": zod.string().nullable(),
+  "discountValue": zod.number(),
+  "discountAmount": zod.number(),
+  "charityAmount": zod.number(),
+  "finalAmount": zod.number(),
   "totalPaid": zod.number(),
-  "balance": zod.number().optional(),
+  "balance": zod.number(),
   "status": zod.string(),
   "createdAt": zod.string()
 }).optional()
@@ -453,8 +468,13 @@ export const UpdateOrderStatusResponse = zod.object({
   "cashAmount": zod.number(),
   "upiAmount": zod.number(),
   "cardAmount": zod.number(),
+  "discountType": zod.string().nullable(),
+  "discountValue": zod.number(),
+  "discountAmount": zod.number(),
+  "charityAmount": zod.number(),
+  "finalAmount": zod.number(),
   "totalPaid": zod.number(),
-  "balance": zod.number().optional(),
+  "balance": zod.number(),
   "status": zod.string(),
   "createdAt": zod.string()
 }).optional()
@@ -533,8 +553,13 @@ export const ReplaceOrderItemsResponse = zod.object({
   "cashAmount": zod.number(),
   "upiAmount": zod.number(),
   "cardAmount": zod.number(),
+  "discountType": zod.string().nullable(),
+  "discountValue": zod.number(),
+  "discountAmount": zod.number(),
+  "charityAmount": zod.number(),
+  "finalAmount": zod.number(),
   "totalPaid": zod.number(),
-  "balance": zod.number().optional(),
+  "balance": zod.number(),
   "status": zod.string(),
   "createdAt": zod.string()
 }).optional()
@@ -583,8 +608,13 @@ export const GetOrderPaymentResponse = zod.object({
   "cashAmount": zod.number(),
   "upiAmount": zod.number(),
   "cardAmount": zod.number(),
+  "discountType": zod.string().nullable(),
+  "discountValue": zod.number(),
+  "discountAmount": zod.number(),
+  "charityAmount": zod.number(),
+  "finalAmount": zod.number(),
   "totalPaid": zod.number(),
-  "balance": zod.number().optional(),
+  "balance": zod.number(),
   "status": zod.string(),
   "createdAt": zod.string()
 })
@@ -598,7 +628,10 @@ export const CreateOrderPaymentBody = zod.object({
   "totalAmount": zod.number(),
   "cashAmount": zod.number().optional(),
   "upiAmount": zod.number().optional(),
-  "cardAmount": zod.number().optional()
+  "cardAmount": zod.number().optional(),
+  "discountType": zod.string().optional(),
+  "discountValue": zod.number().optional(),
+  "charityAmount": zod.number().optional()
 })
 
 
@@ -609,7 +642,10 @@ export const UpdateOrderPaymentParams = zod.object({
 export const UpdateOrderPaymentBody = zod.object({
   "cashAmount": zod.number().optional(),
   "upiAmount": zod.number().optional(),
-  "cardAmount": zod.number().optional()
+  "cardAmount": zod.number().optional(),
+  "discountType": zod.string().optional(),
+  "discountValue": zod.number().optional(),
+  "charityAmount": zod.number().optional()
 })
 
 export const UpdateOrderPaymentResponse = zod.object({
@@ -619,8 +655,13 @@ export const UpdateOrderPaymentResponse = zod.object({
   "cashAmount": zod.number(),
   "upiAmount": zod.number(),
   "cardAmount": zod.number(),
+  "discountType": zod.string().nullable(),
+  "discountValue": zod.number(),
+  "discountAmount": zod.number(),
+  "charityAmount": zod.number(),
+  "finalAmount": zod.number(),
   "totalPaid": zod.number(),
-  "balance": zod.number().optional(),
+  "balance": zod.number(),
   "status": zod.string(),
   "createdAt": zod.string()
 })
@@ -640,8 +681,13 @@ export const VoidOrderPaymentResponse = zod.object({
   "cashAmount": zod.number(),
   "upiAmount": zod.number(),
   "cardAmount": zod.number(),
+  "discountType": zod.string().nullable(),
+  "discountValue": zod.number(),
+  "discountAmount": zod.number(),
+  "charityAmount": zod.number(),
+  "finalAmount": zod.number(),
   "totalPaid": zod.number(),
-  "balance": zod.number().optional(),
+  "balance": zod.number(),
   "status": zod.string(),
   "createdAt": zod.string()
 })
@@ -876,8 +922,13 @@ export const GetDashboardResponse = zod.object({
   "cashAmount": zod.number(),
   "upiAmount": zod.number(),
   "cardAmount": zod.number(),
+  "discountType": zod.string().nullable(),
+  "discountValue": zod.number(),
+  "discountAmount": zod.number(),
+  "charityAmount": zod.number(),
+  "finalAmount": zod.number(),
   "totalPaid": zod.number(),
-  "balance": zod.number().optional(),
+  "balance": zod.number(),
   "status": zod.string(),
   "createdAt": zod.string()
 }).optional()
@@ -897,6 +948,8 @@ export const GetDailyReportResponse = zod.object({
   "upiRevenue": zod.number(),
   "cardRevenue": zod.number(),
   "totalExpenses": zod.number(),
+  "totalDiscount": zod.number(),
+  "totalCharity": zod.number(),
   "estimatedProfit": zod.number(),
   "avgOrderValue": zod.number(),
   "completedOrders": zod.number(),

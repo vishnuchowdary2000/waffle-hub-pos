@@ -25,6 +25,38 @@ import {
 
 const EDITABLE_STATUSES = ["pending_payment", "approved", "preparing"];
 
+function serializePayment(p: typeof paymentsTable.$inferSelect) {
+  const totalAmount    = Number(p.totalAmount);
+  const cashAmount     = Number(p.cashAmount);
+  const upiAmount      = Number(p.upiAmount);
+  const cardAmount     = Number(p.cardAmount);
+  const discountValue  = Number(p.discountValue);
+  const discountAmount = Number(p.discountAmount);
+  const charityAmount  = Number(p.charityAmount);
+  const finalAmount    = totalAmount - discountAmount + charityAmount;
+  const totalPaid      = cashAmount + upiAmount + cardAmount;
+  return {
+    ...p,
+    totalAmount, cashAmount, upiAmount, cardAmount,
+    discountType:   p.discountType ?? null,
+    discountValue,  discountAmount, charityAmount, finalAmount,
+    totalPaid,
+    balance:   finalAmount - totalPaid,
+    createdAt: p.createdAt.toISOString(),
+  };
+}
+
+async function syncPaymentTotal(orderId: number, newTotal: number) {
+  const [p] = await db.select().from(paymentsTable).where(eq(paymentsTable.orderId, orderId));
+  if (!p) return;
+  const discountAmount = p.discountType === "percentage"
+    ? newTotal * Number(p.discountValue) / 100
+    : Number(p.discountAmount);
+  await db.update(paymentsTable)
+    .set({ totalAmount: String(newTotal), discountAmount: String(discountAmount) })
+    .where(eq(paymentsTable.orderId, orderId));
+}
+
 const router: IRouter = Router();
 
 async function getFullOrder(id: number) {
@@ -39,16 +71,7 @@ async function getFullOrder(id: number) {
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
     items: items.map(i => ({ ...i, price: Number(i.price) })),
-    payment: payment ? {
-      ...payment,
-      totalAmount: Number(payment.totalAmount),
-      cashAmount: Number(payment.cashAmount),
-      upiAmount: Number(payment.upiAmount),
-      cardAmount: Number(payment.cardAmount),
-      totalPaid: Number(payment.cashAmount) + Number(payment.upiAmount) + Number(payment.cardAmount),
-      balance: Number(payment.totalAmount) - Number(payment.cashAmount) - Number(payment.upiAmount) - Number(payment.cardAmount),
-      createdAt: payment.createdAt.toISOString(),
-    } : null,
+    payment: payment ? serializePayment(payment) : null,
   };
 }
 
@@ -287,7 +310,7 @@ router.put("/orders/:id/items", async (req, res): Promise<void> => {
   await db.update(ordersTable).set(updateData).where(eq(ordersTable.id, params.data.id));
 
   // Sync payment total if a payment record exists (keeps pending amount correct)
-  await db.update(paymentsTable).set({ totalAmount: String(total) }).where(eq(paymentsTable.orderId, params.data.id));
+  await syncPaymentTotal(params.data.id, total);
 
   const full = await getFullOrder(params.data.id);
   res.json(full);
@@ -313,7 +336,7 @@ router.patch("/orders/:id/items/:itemId", async (req, res): Promise<void> => {
   const allItems = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, params.data.id));
   const total = allItems.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0);
   await db.update(ordersTable).set({ totalAmount: String(total) }).where(eq(ordersTable.id, params.data.id));
-  await db.update(paymentsTable).set({ totalAmount: String(total) }).where(eq(paymentsTable.orderId, params.data.id));
+  await syncPaymentTotal(params.data.id, total);
 
   res.json({ ...item, price: Number(item.price) });
 });
@@ -329,7 +352,7 @@ router.delete("/orders/:id/items/:itemId", async (req, res): Promise<void> => {
   const allItems = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, params.data.id));
   const total = allItems.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0);
   await db.update(ordersTable).set({ totalAmount: String(total) }).where(eq(ordersTable.id, params.data.id));
-  await db.update(paymentsTable).set({ totalAmount: String(total) }).where(eq(paymentsTable.orderId, params.data.id));
+  await syncPaymentTotal(params.data.id, total);
 
   res.sendStatus(204);
 });
@@ -346,19 +369,14 @@ router.post("/orders/:id/payment/void", async (req, res): Promise<void> => {
     cashAmount: "0",
     upiAmount: "0",
     cardAmount: "0",
+    discountType: null,
+    discountValue: "0",
+    discountAmount: "0",
+    charityAmount: "0",
     status: "voided",
   }).where(eq(paymentsTable.orderId, params.data.id)).returning();
 
-  res.json({
-    ...payment,
-    totalAmount: Number(payment.totalAmount),
-    cashAmount: 0,
-    upiAmount: 0,
-    cardAmount: 0,
-    totalPaid: 0,
-    balance: Number(payment.totalAmount),
-    createdAt: payment.createdAt.toISOString(),
-  });
+  res.json(serializePayment(payment));
 });
 
 // Get payment
@@ -367,17 +385,7 @@ router.get("/orders/:id/payment", async (req, res): Promise<void> => {
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
   const [payment] = await db.select().from(paymentsTable).where(eq(paymentsTable.orderId, params.data.id));
   if (!payment) { res.status(404).json({ error: "Payment not found" }); return; }
-  const totalPaid = Number(payment.cashAmount) + Number(payment.upiAmount) + Number(payment.cardAmount);
-  res.json({
-    ...payment,
-    totalAmount: Number(payment.totalAmount),
-    cashAmount: Number(payment.cashAmount),
-    upiAmount: Number(payment.upiAmount),
-    cardAmount: Number(payment.cardAmount),
-    totalPaid,
-    balance: Number(payment.totalAmount) - totalPaid,
-    createdAt: payment.createdAt.toISOString(),
-  });
+  res.json(serializePayment(payment));
 });
 
 // Create payment — auto-approves order if pending_payment
@@ -391,7 +399,14 @@ router.post("/orders/:id/payment", async (req, res): Promise<void> => {
   const upiAmt = parsed.data.upiAmount ?? 0;
   const cardAmt = parsed.data.cardAmount ?? 0;
   const totalPaid = cashAmt + upiAmt + cardAmt;
-  const status = totalPaid >= parsed.data.totalAmount ? "paid" : totalPaid > 0 ? "partial" : "pending";
+  const discountType = parsed.data.discountType ?? null;
+  const discountValue = parsed.data.discountValue ?? 0;
+  const discountAmount = discountType === "percentage"
+    ? parsed.data.totalAmount * discountValue / 100
+    : discountType === "fixed" ? discountValue : 0;
+  const charityAmount = parsed.data.charityAmount ?? 0;
+  const finalAmount = parsed.data.totalAmount - discountAmount + charityAmount;
+  const status = totalPaid >= finalAmount ? "paid" : totalPaid > 0 ? "partial" : "pending";
 
   const [payment] = await db.insert(paymentsTable).values({
     orderId: params.data.id,
@@ -399,6 +414,10 @@ router.post("/orders/:id/payment", async (req, res): Promise<void> => {
     cashAmount: String(cashAmt),
     upiAmount: String(upiAmt),
     cardAmount: String(cardAmt),
+    discountType,
+    discountValue: String(discountValue),
+    discountAmount: String(discountAmount),
+    charityAmount: String(charityAmount),
     status,
   }).returning();
 
@@ -408,16 +427,7 @@ router.post("/orders/:id/payment", async (req, res): Promise<void> => {
     await db.update(ordersTable).set({ status: "approved" }).where(eq(ordersTable.id, params.data.id));
   }
 
-  res.status(201).json({
-    ...payment,
-    totalAmount: Number(payment.totalAmount),
-    cashAmount: Number(payment.cashAmount),
-    upiAmount: Number(payment.upiAmount),
-    cardAmount: Number(payment.cardAmount),
-    totalPaid,
-    balance: Number(payment.totalAmount) - totalPaid,
-    createdAt: payment.createdAt.toISOString(),
-  });
+  res.status(201).json(serializePayment(payment));
 });
 
 // Update payment — auto-approves order if pending_payment
@@ -435,12 +445,25 @@ router.patch("/orders/:id/payment", async (req, res): Promise<void> => {
   const cardAmt = parsed.data.cardAmount ?? Number(existing.cardAmount);
   const totalPaid = cashAmt + upiAmt + cardAmt;
   const totalAmount = Number(existing.totalAmount);
-  const status = totalPaid >= totalAmount ? "paid" : totalPaid > 0 ? "partial" : "pending";
+  const discountType = parsed.data.discountType !== undefined
+    ? (parsed.data.discountType || null)
+    : (existing.discountType ?? null);
+  const discountValue = parsed.data.discountValue ?? Number(existing.discountValue);
+  const discountAmount = discountType === "percentage"
+    ? totalAmount * discountValue / 100
+    : discountType === "fixed" ? discountValue : 0;
+  const charityAmount = parsed.data.charityAmount ?? Number(existing.charityAmount);
+  const finalAmount = totalAmount - discountAmount + charityAmount;
+  const status = totalPaid >= finalAmount ? "paid" : totalPaid > 0 ? "partial" : "pending";
 
   const [payment] = await db.update(paymentsTable).set({
     cashAmount: String(cashAmt),
     upiAmount: String(upiAmt),
     cardAmount: String(cardAmt),
+    discountType,
+    discountValue: String(discountValue),
+    discountAmount: String(discountAmount),
+    charityAmount: String(charityAmount),
     status,
   }).where(eq(paymentsTable.orderId, params.data.id)).returning();
 
@@ -450,16 +473,7 @@ router.patch("/orders/:id/payment", async (req, res): Promise<void> => {
     await db.update(ordersTable).set({ status: "approved" }).where(eq(ordersTable.id, params.data.id));
   }
 
-  res.json({
-    ...payment,
-    totalAmount: Number(payment.totalAmount),
-    cashAmount: Number(payment.cashAmount),
-    upiAmount: Number(payment.upiAmount),
-    cardAmount: Number(payment.cardAmount),
-    totalPaid,
-    balance: totalAmount - totalPaid,
-    createdAt: payment.createdAt.toISOString(),
-  });
+  res.json(serializePayment(payment));
 });
 
 export default router;

@@ -88,8 +88,14 @@ export interface Payment {
   cashAmount: number;
   upiAmount: number;
   cardAmount: number;
+  /** @nullable */
+  discountType: string | null;
+  discountValue: number;
+  discountAmount: number;
+  charityAmount: number;
+  finalAmount: number;
   totalPaid: number;
-  balance?: number;
+  balance: number;
   status: string;
   createdAt: string;
 }
@@ -169,12 +175,18 @@ export interface PaymentInput {
   cashAmount?: number;
   upiAmount?: number;
   cardAmount?: number;
+  discountType?: string;
+  discountValue?: number;
+  charityAmount?: number;
 }
 
 export interface PaymentUpdate {
   cashAmount?: number;
   upiAmount?: number;
   cardAmount?: number;
+  discountType?: string;
+  discountValue?: number;
+  charityAmount?: number;
 }
 
 export interface Customer {
@@ -253,6 +265,8 @@ export interface DailyReport {
   upiRevenue: number;
   cardRevenue: number;
   totalExpenses: number;
+  totalDiscount: number;
+  totalCharity: number;
   estimatedProfit: number;
   avgOrderValue: number;
   completedOrders: number;

@@ -40,11 +40,14 @@ router.get("/reports/daily", async (req, res): Promise<void> => {
       lte(ordersTable.createdAt, end),
     ));
 
-  const cashRevenue = payments.reduce((s, p) => s + Number(p.payments.cashAmount), 0);
-  const upiRevenue = payments.reduce((s, p) => s + Number(p.payments.upiAmount), 0);
-  const cardRevenue = payments.reduce((s, p) => s + Number(p.payments.cardAmount), 0);
-  const totalRevenue = cashRevenue + upiRevenue + cardRevenue;
-  const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
+  const cashRevenue    = payments.reduce((s, p) => s + Number(p.payments.cashAmount), 0);
+  const upiRevenue     = payments.reduce((s, p) => s + Number(p.payments.upiAmount), 0);
+  const cardRevenue    = payments.reduce((s, p) => s + Number(p.payments.cardAmount), 0);
+  const totalCharity   = payments.reduce((s, p) => s + Number(p.payments.charityAmount), 0);
+  const totalDiscount  = payments.reduce((s, p) => s + Number(p.payments.discountAmount), 0);
+  const totalCollected = cashRevenue + upiRevenue + cardRevenue;
+  const totalRevenue   = totalCollected - totalCharity;
+  const totalExpenses  = expenses.reduce((s, e) => s + Number(e.amount), 0);
 
   res.json({
     date: targetDate.toISOString().split("T")[0],
@@ -54,6 +57,8 @@ router.get("/reports/daily", async (req, res): Promise<void> => {
     upiRevenue,
     cardRevenue,
     totalExpenses,
+    totalDiscount,
+    totalCharity,
     estimatedProfit: totalRevenue - totalExpenses,
     avgOrderValue: completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0,
     completedOrders: completedOrders.length,

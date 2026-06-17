@@ -56,12 +56,28 @@ export default function Reports() {
             <div className="bg-card border border-card-border rounded-xl p-5">
               <h3 className="text-sm font-semibold text-muted-foreground mb-4 uppercase tracking-wide">Revenue Breakdown</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <RevenueBar label="Cash" amount={daily.cashRevenue} total={daily.totalRevenue} color="bg-emerald-500" />
-                <RevenueBar label="UPI / QR" amount={daily.upiRevenue} total={daily.totalRevenue} color="bg-blue-500" />
-                <RevenueBar label="Card" amount={daily.cardRevenue} total={daily.totalRevenue} color="bg-purple-500" />
+                <RevenueBar label="Cash" amount={daily.cashRevenue} total={daily.totalRevenue + daily.totalCharity} color="bg-emerald-500" />
+                <RevenueBar label="UPI / QR" amount={daily.upiRevenue} total={daily.totalRevenue + daily.totalCharity} color="bg-blue-500" />
+                <RevenueBar label="Card" amount={daily.cardRevenue} total={daily.totalRevenue + daily.totalCharity} color="bg-purple-500" />
               </div>
+              {(daily.totalDiscount > 0 || daily.totalCharity > 0) && (
+                <div className="space-y-1.5 mb-4 text-sm">
+                  {daily.totalDiscount > 0 && (
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>Discounts Given</span>
+                      <span className="font-semibold text-emerald-400">−{formatCurrency(daily.totalDiscount)}</span>
+                    </div>
+                  )}
+                  {daily.totalCharity > 0 && (
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>Charity Collected</span>
+                      <span className="font-semibold text-blue-400">+{formatCurrency(daily.totalCharity)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="border-t border-border pt-4 flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Total Revenue</span>
+                <span className="text-sm text-muted-foreground">Net Revenue (excl. charity)</span>
                 <span className="text-2xl font-bold text-primary">{formatCurrency(daily.totalRevenue)}</span>
               </div>
             </div>

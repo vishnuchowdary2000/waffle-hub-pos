@@ -1020,34 +1020,45 @@ components:
     # ── Payment ───────────────────────────────────────────────────────────────
     Payment:
       type: object
-      required: [id, orderId, totalAmount, cashAmount, upiAmount, cardAmount, totalPaid, status, createdAt]
+      required: [id, orderId, totalAmount, cashAmount, upiAmount, cardAmount, discountType, discountValue, discountAmount, charityAmount, finalAmount, totalPaid, balance, status, createdAt]
       properties:
-        id:          { type: integer }
-        orderId:     { type: integer }
-        totalAmount: { type: number }
-        cashAmount:  { type: number }
-        upiAmount:   { type: number }
-        cardAmount:  { type: number }
-        totalPaid:   { type: number }
-        balance:     { type: number }
-        status:      { type: string }
-        createdAt:   { type: string }
+        id:             { type: integer }
+        orderId:        { type: integer }
+        totalAmount:    { type: number }
+        cashAmount:     { type: number }
+        upiAmount:      { type: number }
+        cardAmount:     { type: number }
+        discountType:   { type: ["string", "null"] }
+        discountValue:  { type: number }
+        discountAmount: { type: number }
+        charityAmount:  { type: number }
+        finalAmount:    { type: number }
+        totalPaid:      { type: number }
+        balance:        { type: number }
+        status:         { type: string }
+        createdAt:      { type: string }
 
     PaymentInput:
       type: object
       required: [totalAmount]
       properties:
-        totalAmount: { type: number }
-        cashAmount:  { type: number }
-        upiAmount:   { type: number }
-        cardAmount:  { type: number }
+        totalAmount:    { type: number }
+        cashAmount:     { type: number }
+        upiAmount:      { type: number }
+        cardAmount:     { type: number }
+        discountType:   { type: string }
+        discountValue:  { type: number }
+        charityAmount:  { type: number }
 
     PaymentUpdate:
       type: object
       properties:
-        cashAmount: { type: number }
-        upiAmount:  { type: number }
-        cardAmount: { type: number }
+        cashAmount:     { type: number }
+        upiAmount:      { type: number }
+        cardAmount:     { type: number }
+        discountType:   { type: string }
+        discountValue:  { type: number }
+        charityAmount:  { type: number }
 
     # ── Customer ──────────────────────────────────────────────────────────────
     Customer:
@@ -1130,7 +1141,7 @@ components:
     # ── Reports ───────────────────────────────────────────────────────────────
     DailyReport:
       type: object
-      required: [date, totalOrders, totalRevenue, cashRevenue, upiRevenue, cardRevenue, totalExpenses, estimatedProfit, avgOrderValue, completedOrders, cancelledOrders]
+      required: [date, totalOrders, totalRevenue, cashRevenue, upiRevenue, cardRevenue, totalExpenses, totalDiscount, totalCharity, estimatedProfit, avgOrderValue, completedOrders, cancelledOrders]
       properties:
         date:             { type: string }
         totalOrders:      { type: integer }
@@ -1139,6 +1150,8 @@ components:
         upiRevenue:       { type: number }
         cardRevenue:      { type: number }
         totalExpenses:    { type: number }
+        totalDiscount:    { type: number }
+        totalCharity:     { type: number }
         estimatedProfit:  { type: number }
         avgOrderValue:    { type: number }
         completedOrders:  { type: integer }

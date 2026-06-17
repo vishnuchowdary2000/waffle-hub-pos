@@ -44,6 +44,10 @@ export const paymentsTable = pgTable("payments", {
   cashAmount: numeric("cash_amount", { precision: 10, scale: 2 }).notNull().default("0"),
   upiAmount: numeric("upi_amount", { precision: 10, scale: 2 }).notNull().default("0"),
   cardAmount: numeric("card_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  discountType: text("discount_type"),
+  discountValue: numeric("discount_value", { precision: 10, scale: 2 }).notNull().default("0"),
+  discountAmount: numeric("discount_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  charityAmount: numeric("charity_amount", { precision: 10, scale: 2 }).notNull().default("0"),
   status: text("status").notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
