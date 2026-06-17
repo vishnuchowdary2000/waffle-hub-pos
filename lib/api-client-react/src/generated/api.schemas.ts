@@ -308,6 +308,26 @@ export interface PublicMenuCategory {
   products: PublicMenuProduct[];
 }
 
+export type PublicCustomerProfileRecentOrdersItem = {
+  orderNumber: string;
+  totalAmount: number;
+  createdAt: string;
+  itemSummary: string;
+};
+
+export interface PublicCustomerProfile {
+  id: number;
+  name: string;
+  phone: string;
+  orderCount: number;
+  totalSpending: number;
+  /** @nullable */
+  favoriteItems?: string | null;
+  /** @nullable */
+  lastOrderDate?: string | null;
+  recentOrders?: PublicCustomerProfileRecentOrdersItem[];
+}
+
 export interface PublicStats {
   preparing: number;
   rushLevel: string;
@@ -327,6 +347,10 @@ export interface OrderTrackingResult {
   createdAt: string;
   items: OrderItem[];
 }
+
+export type LookupPublicCustomerParams = {
+phone: string;
+};
 
 export type ListProductsParams = {
 categoryId?: number;

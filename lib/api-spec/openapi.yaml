@@ -81,6 +81,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/OrderTrackingResult"
 
+  /public/customers/lookup:
+    get:
+      operationId: lookupPublicCustomer
+      tags: [public]
+      summary: Look up an existing customer by phone number (public)
+      parameters:
+        - name: phone
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Customer found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicCustomerProfile"
+        "404":
+          description: Customer not found
+
   /public/orders/{orderNumber}:
     get:
       operationId: trackPublicOrder
@@ -1161,6 +1182,28 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PublicMenuProduct"
+
+    PublicCustomerProfile:
+      type: object
+      required: [id, name, phone, orderCount, totalSpending]
+      properties:
+        id:            { type: integer }
+        name:          { type: string }
+        phone:         { type: string }
+        orderCount:    { type: integer }
+        totalSpending: { type: number }
+        favoriteItems: { type: ["string", "null"] }
+        lastOrderDate: { type: ["string", "null"] }
+        recentOrders:
+          type: array
+          items:
+            type: object
+            required: [orderNumber, totalAmount, createdAt, itemSummary]
+            properties:
+              orderNumber: { type: string }
+              totalAmount:  { type: number }
+              createdAt:    { type: string }
+              itemSummary:  { type: string }
 
     PublicStats:
       type: object

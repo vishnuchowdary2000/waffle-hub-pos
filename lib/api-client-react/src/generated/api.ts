@@ -38,6 +38,7 @@ import type {
   ListExpensesParams,
   ListOrdersParams,
   ListProductsParams,
+  LookupPublicCustomerParams,
   Order,
   OrderInput,
   OrderItem,
@@ -53,6 +54,7 @@ import type {
   ProductInput,
   ProductSalesItem,
   ProductUpdate,
+  PublicCustomerProfile,
   PublicMenuCategory,
   PublicStats,
   ReplaceOrderItemsInput,
@@ -374,6 +376,90 @@ export const useCreatePublicOrder = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getCreatePublicOrderMutationOptions(options));
     }
+
+export const getLookupPublicCustomerUrl = (params: LookupPublicCustomerParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/public/customers/lookup?${stringifiedParams}` : `/api/public/customers/lookup`
+}
+
+/**
+ * @summary Look up an existing customer by phone number (public)
+ */
+export const lookupPublicCustomer = async (params: LookupPublicCustomerParams, options?: RequestInit): Promise<PublicCustomerProfile> => {
+
+  return customFetch<PublicCustomerProfile>(getLookupPublicCustomerUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getLookupPublicCustomerQueryKey = (params?: LookupPublicCustomerParams,) => {
+    return [
+    `/api/public/customers/lookup`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getLookupPublicCustomerQueryOptions = <TData = Awaited<ReturnType<typeof lookupPublicCustomer>>, TError = ErrorType<void>>(params: LookupPublicCustomerParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof lookupPublicCustomer>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getLookupPublicCustomerQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof lookupPublicCustomer>>> = ({ signal }) => lookupPublicCustomer(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof lookupPublicCustomer>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type LookupPublicCustomerQueryResult = NonNullable<Awaited<ReturnType<typeof lookupPublicCustomer>>>
+export type LookupPublicCustomerQueryError = ErrorType<void>
+
+
+/**
+ * @summary Look up an existing customer by phone number (public)
+ */
+
+export function useLookupPublicCustomer<TData = Awaited<ReturnType<typeof lookupPublicCustomer>>, TError = ErrorType<void>>(
+ params: LookupPublicCustomerParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof lookupPublicCustomer>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getLookupPublicCustomerQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getTrackPublicOrderUrl = (orderNumber: string,) => {
 

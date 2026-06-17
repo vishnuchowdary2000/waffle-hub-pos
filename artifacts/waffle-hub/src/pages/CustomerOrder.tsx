@@ -1,12 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { useGetPublicMenu, useGetPublicStats, useCreatePublicOrder, getGetPublicStatsQueryKey } from "@workspace/api-client-react";
+import {
+  useGetPublicMenu,
+  useGetPublicStats,
+  useCreatePublicOrder,
+  useLookupPublicCustomer,
+  getLookupPublicCustomerQueryKey,
+  getGetPublicStatsQueryKey,
+} from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
 import {
   ShoppingCart, Minus, Plus, X, ChefHat,
   User, Phone, UtensilsCrossed, ShoppingBag,
   AlertCircle, CheckCircle2, Zap, Clock,
-  ArrowRight, Trash2, RefreshCw,
+  ArrowRight, Trash2, RefreshCw, Star, History,
 } from "lucide-react";
 
 type Step = "info" | "menu" | "confirm";
@@ -25,6 +32,10 @@ const RUSH_CONFIG = {
   high:     { label: "🔴 High Rush",     color: "text-red-400",    bg: "bg-red-500/10 border-red-500/20" },
 };
 
+function phoneDigitCount(value: string) {
+  return value.replace(/\D/g, "").length;
+}
+
 export default function CustomerOrder() {
   const [, navigate] = useLocation();
   const [step, setStep] = useState<Step>("info");
@@ -35,12 +46,51 @@ export default function CustomerOrder() {
   const [activeCategory, setActiveCategory] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
 
+  const [nameError, setNameError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+
+  const autoFilledNameRef = useRef<string | null>(null);
+
   const { data: menu = [], isLoading: menuLoading } = useGetPublicMenu();
   const { data: stats } = useGetPublicStats({
     query: { queryKey: getGetPublicStatsQueryKey(), refetchInterval: 10000 },
   });
 
   const createOrder = useCreatePublicOrder();
+
+  const digits = phoneDigitCount(phone);
+  const lookupEnabled = digits >= 10;
+
+  const { data: customerProfile, isFetching: lookingUp, isError: notFound } = useLookupPublicCustomer(
+    { phone },
+    {
+      query: {
+        queryKey: getLookupPublicCustomerQueryKey({ phone }),
+        enabled: lookupEnabled,
+        retry: false,
+        staleTime: 30_000,
+      },
+    }
+  );
+
+  useEffect(() => {
+    if (customerProfile) {
+      if (!name.trim() || name === autoFilledNameRef.current) {
+        setName(customerProfile.name);
+        autoFilledNameRef.current = customerProfile.name;
+        setNameError("");
+      }
+    }
+  }, [customerProfile]);
+
+  useEffect(() => {
+    if (!lookupEnabled) {
+      if (name === autoFilledNameRef.current) {
+        setName("");
+        autoFilledNameRef.current = null;
+      }
+    }
+  }, [lookupEnabled]);
 
   useEffect(() => {
     if (menu.length > 0 && activeCategory === null) {
@@ -71,12 +121,33 @@ export default function CustomerOrder() {
   const totalItems = cart.reduce((s, c) => s + c.quantity, 0);
   const totalAmount = cart.reduce((s, c) => s + c.price * c.quantity, 0);
 
+  const handleContinue = () => {
+    let hasError = false;
+    if (!name.trim()) {
+      setNameError("Name is required");
+      hasError = true;
+    } else {
+      setNameError("");
+    }
+    if (!phone.trim()) {
+      setPhoneError("Mobile number is required");
+      hasError = true;
+    } else if (digits < 10) {
+      setPhoneError("Enter at least 10 digits");
+      hasError = true;
+    } else {
+      setPhoneError("");
+    }
+    if (!hasError) setStep("menu");
+  };
+
   const handlePlaceOrder = () => {
     createOrder.mutate(
       {
         data: {
           customerName: name.trim(),
-          customerPhone: phone.trim() || undefined,
+          customerPhone: phone.trim(),
+          customerId: customerProfile?.id,
           orderType,
           notes: notes.trim() || undefined,
           items: cart.map(c => ({
@@ -100,6 +171,9 @@ export default function CustomerOrder() {
   const rush = RUSH_CONFIG[rushLevel];
   const activeCat = menu.find(c => c.id === activeCategory);
 
+  const isReturningCustomer = lookupEnabled && !!customerProfile;
+  const isNewCustomer = lookupEnabled && !lookingUp && notFound;
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* ── Header ─────────────────────────────────────────────── */}
@@ -116,13 +190,11 @@ export default function CustomerOrder() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Rush level pill */}
             {stats && (
               <div className={cn("hidden sm:flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border", rush.bg, rush.color)}>
                 {rush.label}
               </div>
             )}
-            {/* Cart button (visible in menu step) */}
             {step === "menu" && totalItems > 0 && (
               <button
                 onClick={() => setStep("confirm")}
@@ -137,14 +209,14 @@ export default function CustomerOrder() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {/* ── Preparing count + Rush (mobile) ────────────────────────────── */}
+        {/* ── Rush + stats bar ─────────────────────────────────────────────── */}
         <div className={cn("flex items-center justify-between rounded-xl border px-4 py-3 text-sm", rush.bg)}>
           <div className="flex items-center gap-2">
             <Zap size={14} className={rush.color} />
             <span className={cn("font-semibold", rush.color)}>{rush.label}</span>
           </div>
           <span className="text-muted-foreground text-xs">
-            Orders being prepared: <span className="font-bold text-foreground">{stats?.preparing ?? 0}</span>
+            Preparing: <span className="font-bold text-foreground">{stats?.preparing ?? 0}</span>
           </span>
         </div>
 
@@ -152,45 +224,125 @@ export default function CustomerOrder() {
         <div className="flex gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-4 py-3">
           <Clock size={15} className="text-amber-400 mt-0.5 shrink-0" />
           <p className="text-xs text-amber-400/90 leading-relaxed">
-            Freshly prepared items may require waiting time depending on current kitchen workload.
-            Minimum preparation time is usually <strong>10–15 minutes</strong>.
+            Freshly prepared items may require waiting time. Minimum preparation time is usually <strong>10–15 minutes</strong>.
           </p>
         </div>
 
-        {/* ── Step 1: Customer Info ───────────────────────────────────────── */}
+        {/* ── Step 1: Customer Info ─────────────────────────────────────────── */}
         {step === "info" && (
           <div className="space-y-5">
             <div>
               <h2 className="text-xl font-bold text-foreground">Your Details</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">Let us know who to call when your order is ready</p>
+              <p className="text-sm text-muted-foreground mt-0.5">We'll call you when your order is ready</p>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* Mobile Number — shown first for auto-lookup */}
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+                  <Phone size={12} /> Mobile Number *
+                </label>
+                <div className="relative">
+                  <input
+                    value={phone}
+                    onChange={e => {
+                      setPhone(e.target.value);
+                      if (phoneError) setPhoneError("");
+                    }}
+                    placeholder="10-digit mobile number"
+                    inputMode="numeric"
+                    maxLength={15}
+                    className={cn(
+                      "w-full bg-card border rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring text-base pr-10",
+                      phoneError ? "border-destructive focus:ring-destructive/50" : "border-input"
+                    )}
+                  />
+                  {/* Status indicator inside input */}
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {lookingUp && <RefreshCw size={15} className="animate-spin text-muted-foreground" />}
+                    {isReturningCustomer && <CheckCircle2 size={15} className="text-green-400" />}
+                  </div>
+                </div>
+                {phoneError && (
+                  <p className="text-xs text-destructive mt-1.5 flex items-center gap-1">
+                    <AlertCircle size={11} /> {phoneError}
+                  </p>
+                )}
+              </div>
+
+              {/* Returning customer profile card */}
+              {isReturningCustomer && customerProfile && (
+                <div className="bg-green-500/8 border border-green-500/25 rounded-2xl px-4 py-3 space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
+                      <CheckCircle2 size={14} className="text-green-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-foreground">Welcome back, {customerProfile.name}!</p>
+                      <p className="text-xs text-muted-foreground">
+                        {customerProfile.orderCount} order{customerProfile.orderCount !== 1 ? "s" : ""} · ₹{customerProfile.totalSpending.toFixed(0)} total spent
+                      </p>
+                    </div>
+                  </div>
+
+                  {customerProfile.favoriteItems && (
+                    <div className="flex items-start gap-1.5 text-xs text-amber-400/90">
+                      <Star size={11} className="mt-0.5 shrink-0 fill-amber-400" />
+                      <span>Favourites: {customerProfile.favoriteItems}</span>
+                    </div>
+                  )}
+
+                  {customerProfile.recentOrders && customerProfile.recentOrders.length > 0 && (
+                    <div className="border-t border-green-500/15 pt-2 space-y-1.5">
+                      <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                        <History size={11} /> Recent orders
+                      </p>
+                      {customerProfile.recentOrders.map(o => (
+                        <div key={o.orderNumber} className="flex items-start gap-2 text-xs">
+                          <span className="font-mono text-muted-foreground shrink-0">{o.orderNumber}</span>
+                          <span className="text-foreground/80 flex-1 truncate">{o.itemSummary}</span>
+                          <span className="text-primary font-semibold shrink-0">₹{o.totalAmount}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* New customer indicator */}
+              {isNewCustomer && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground bg-secondary/50 border border-border rounded-xl px-3 py-2">
+                  <User size={12} />
+                  <span>New customer — we'll create your profile when you order</span>
+                </div>
+              )}
+
+              {/* Name */}
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
                   <User size={12} /> Name *
                 </label>
                 <input
                   value={name}
-                  onChange={e => setName(e.target.value)}
+                  onChange={e => {
+                    setName(e.target.value);
+                    autoFilledNameRef.current = null;
+                    if (nameError) setNameError("");
+                  }}
                   placeholder="Your name"
-                  className="w-full bg-card border border-input rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring text-base"
+                  className={cn(
+                    "w-full bg-card border rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring text-base",
+                    nameError ? "border-destructive focus:ring-destructive/50" : "border-input"
+                  )}
                 />
+                {nameError && (
+                  <p className="text-xs text-destructive mt-1.5 flex items-center gap-1">
+                    <AlertCircle size={11} /> {nameError}
+                  </p>
+                )}
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-                  <Phone size={12} /> Mobile Number
-                </label>
-                <input
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                  placeholder="Optional, for order updates"
-                  inputMode="numeric"
-                  className="w-full bg-card border border-input rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring text-base"
-                />
-              </div>
-
+              {/* Order type */}
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
                   Order Type *
@@ -222,16 +374,15 @@ export default function CustomerOrder() {
             </div>
 
             <button
-              disabled={!name.trim()}
-              onClick={() => setStep("menu")}
-              className="w-full py-4 bg-primary text-primary-foreground rounded-2xl font-bold text-base flex items-center justify-center gap-2 disabled:opacity-40"
+              onClick={handleContinue}
+              className="w-full py-4 bg-primary text-primary-foreground rounded-2xl font-bold text-base flex items-center justify-center gap-2"
             >
               Browse Menu <ArrowRight size={18} />
             </button>
           </div>
         )}
 
-        {/* ── Step 2: Menu ───────────────────────────────────────────────── */}
+        {/* ── Step 2: Menu ──────────────────────────────────────────────────── */}
         {step === "menu" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -248,7 +399,6 @@ export default function CustomerOrder() {
               <div className="flex justify-center py-12"><RefreshCw className="animate-spin text-primary" size={24} /></div>
             ) : (
               <>
-                {/* Category tabs */}
                 <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
                   {menu.map(cat => (
                     <button
@@ -266,7 +416,6 @@ export default function CustomerOrder() {
                   ))}
                 </div>
 
-                {/* Products */}
                 <div className="space-y-2">
                   {activeCat?.products.map(product => {
                     const qty = cartQty(product.id);
@@ -308,7 +457,6 @@ export default function CustomerOrder() {
               </>
             )}
 
-            {/* Sticky cart bar */}
             {totalItems > 0 && (
               <div className="sticky bottom-4 pt-2">
                 <button
@@ -326,7 +474,7 @@ export default function CustomerOrder() {
           </div>
         )}
 
-        {/* ── Step 3: Confirm ────────────────────────────────────────────── */}
+        {/* ── Step 3: Confirm ───────────────────────────────────────────────── */}
         {step === "confirm" && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
@@ -336,12 +484,16 @@ export default function CustomerOrder() {
               </button>
             </div>
 
-            {/* Customer summary */}
             <div className="bg-card border border-border rounded-2xl px-4 py-3 space-y-2">
               <div className="flex items-center gap-2 text-sm">
                 <User size={13} className="text-muted-foreground" />
                 <span className="font-semibold text-foreground">{name}</span>
                 {phone && <span className="text-muted-foreground">· {phone}</span>}
+                {isReturningCustomer && (
+                  <span className="text-xs bg-green-500/15 text-green-400 px-2 py-0.5 rounded-full border border-green-500/25 font-semibold">
+                    Returning
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2 text-sm">
                 {orderType === "dine_in"
@@ -351,7 +503,6 @@ export default function CustomerOrder() {
               </div>
             </div>
 
-            {/* Cart items */}
             <div className="space-y-2">
               {cart.map(item => (
                 <div key={item.productId} className="bg-card border border-border rounded-xl px-4 py-3 flex items-center gap-3">
@@ -380,7 +531,6 @@ export default function CustomerOrder() {
               ))}
             </div>
 
-            {/* Notes */}
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
                 Special Instructions (optional)
@@ -394,13 +544,11 @@ export default function CustomerOrder() {
               />
             </div>
 
-            {/* Total */}
             <div className="bg-card border border-border rounded-2xl px-4 py-4 flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Total Amount</span>
               <span className="text-2xl font-black text-foreground">₹{totalAmount}</span>
             </div>
 
-            {/* Pay at counter notice */}
             <div className="flex gap-3 bg-blue-500/8 border border-blue-500/20 rounded-xl px-4 py-3">
               <AlertCircle size={15} className="text-blue-400 shrink-0 mt-0.5" />
               <p className="text-xs text-blue-400/90 leading-relaxed">

@@ -68,6 +68,30 @@ export const CreatePublicOrderBody = zod.object({
 
 
 /**
+ * @summary Look up an existing customer by phone number (public)
+ */
+export const LookupPublicCustomerQueryParams = zod.object({
+  "phone": zod.coerce.string()
+})
+
+export const LookupPublicCustomerResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "orderCount": zod.number(),
+  "totalSpending": zod.number(),
+  "favoriteItems": zod.string().nullish(),
+  "lastOrderDate": zod.string().nullish(),
+  "recentOrders": zod.array(zod.object({
+  "orderNumber": zod.string(),
+  "totalAmount": zod.number(),
+  "createdAt": zod.string(),
+  "itemSummary": zod.string()
+})).optional()
+})
+
+
+/**
  * @summary Track order by order number (public)
  */
 export const TrackPublicOrderParams = zod.object({

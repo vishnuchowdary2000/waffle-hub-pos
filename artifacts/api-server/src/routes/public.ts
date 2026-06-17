@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, or, inArray } from "drizzle-orm";
+import { eq, and, inArray, desc, sql } from "drizzle-orm";
 import { db, ordersTable, orderItemsTable, categoriesTable, productsTable, customersTable } from "@workspace/db";
 import { CreateOrderBody } from "@workspace/api-zod";
 
@@ -24,6 +24,44 @@ router.get("/public/menu", async (_req, res): Promise<void> => {
   })).filter(cat => cat.products.length > 0);
 
   res.json(result);
+});
+
+// ── GET /public/customers/lookup ──────────────────────────────────────────────
+router.get("/public/customers/lookup", async (req, res): Promise<void> => {
+  const phone = String(req.query.phone ?? "").trim();
+  if (!phone) { res.status(400).json({ error: "Phone is required" }); return; }
+
+  const [customer] = await db.select().from(customersTable).where(eq(customersTable.phone, phone));
+  if (!customer) { res.status(404).json({ error: "Customer not found" }); return; }
+
+  const recentOrders = await db.select().from(ordersTable)
+    .where(and(eq(ordersTable.customerId, customer.id), eq(ordersTable.status, "completed")))
+    .orderBy(desc(ordersTable.createdAt))
+    .limit(3);
+
+  const recentOrdersWithItems = await Promise.all(
+    recentOrders.map(async o => {
+      const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, o.id));
+      const itemSummary = items.map(i => `${i.productName}×${i.quantity}`).join(", ");
+      return {
+        orderNumber: o.orderNumber,
+        totalAmount: Number(o.totalAmount),
+        createdAt: o.createdAt.toISOString(),
+        itemSummary,
+      };
+    })
+  );
+
+  res.json({
+    id: customer.id,
+    name: customer.name,
+    phone: customer.phone,
+    orderCount: customer.orderCount,
+    totalSpending: Number(customer.totalSpending),
+    favoriteItems: customer.favoriteItems ?? null,
+    lastOrderDate: customer.lastOrderDate?.toISOString() ?? null,
+    recentOrders: recentOrdersWithItems,
+  });
 });
 
 // ── GET /public/stats ─────────────────────────────────────────────────────────
