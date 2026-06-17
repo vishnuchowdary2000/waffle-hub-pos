@@ -10,10 +10,11 @@ import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import {
   Clock, RefreshCw, ChefHat, ShoppingBag,
-  UtensilsCrossed, Zap,
+  UtensilsCrossed, Zap, Sparkles,
 } from "lucide-react";
 
 const ACTIVE_STATUSES = "approved,preparing,ready";
+const NEW_ITEM_TTL_MS = 45_000; // 45 s highlight window
 
 type Order = ListOrdersQueryResult[number];
 
@@ -40,7 +41,18 @@ function sortOrders(orders: Order[]) {
 
 export default function Kitchen() {
   const qc = useQueryClient();
-  const prevIds = useRef<Set<number>>(new Set());
+
+  // ── New-order sound tracking (existing) ─────────────────────────────────
+  const prevOrderIds = useRef<Set<number>>(new Set());
+
+  // ── Per-order item snapshot: orderId → Set of known item IDs ────────────
+  // When an order first arrives, all its items are recorded as "baseline" (no highlight).
+  // On subsequent polls, any item ID absent from the snapshot is "new".
+  const orderItemSnapshot = useRef<Map<number, Set<number>>>(new Map());
+
+  // ── Highlighted items: itemId → expiry timestamp ─────────────────────────
+  const [newItemHighlights, setNewItemHighlights] = useState<Map<number, number>>(new Map());
+
   const [tick, setTick] = useState(0);
 
   const { data: orders = [], isLoading } = useListOrders(
@@ -50,16 +62,70 @@ export default function Kitchen() {
 
   const updateStatus = useUpdateOrderStatus();
 
+  // ── Detect new orders AND new items within existing orders ───────────────
   useEffect(() => {
-    const cur = new Set(orders.map(o => o.id));
-    if (prevIds.current.size > 0 && orders.some(o => !prevIds.current.has(o.id))) {
+    const now = Date.now();
+    const currentOrderIds = new Set(orders.map(o => o.id));
+
+    // Sound for brand-new orders (existing behaviour)
+    const hasNewOrder = orders.some(o => !prevOrderIds.current.has(o.id));
+    if (prevOrderIds.current.size > 0 && hasNewOrder) {
       playNotificationSound();
     }
-    prevIds.current = cur;
+    prevOrderIds.current = currentOrderIds;
+
+    // Item diff per order
+    const addedItemIds: number[] = [];
+
+    for (const order of orders) {
+      const knownItems = orderItemSnapshot.current.get(order.id);
+      const currentItemIds = new Set(order.items.map(i => i.id));
+
+      if (!knownItems) {
+        // Brand-new order — record baseline, no highlighting (whole ticket is new)
+        orderItemSnapshot.current.set(order.id, currentItemIds);
+      } else {
+        // Existing order — find items that weren't there before
+        for (const itemId of currentItemIds) {
+          if (!knownItems.has(itemId)) {
+            addedItemIds.push(itemId);
+          }
+        }
+        // Update snapshot to include new items
+        orderItemSnapshot.current.set(order.id, currentItemIds);
+      }
+    }
+
+    // Clean up snapshots for orders that left the active list
+    for (const orderId of orderItemSnapshot.current.keys()) {
+      if (!currentOrderIds.has(orderId)) {
+        orderItemSnapshot.current.delete(orderId);
+      }
+    }
+
+    // Apply highlights for newly-added items
+    if (addedItemIds.length > 0) {
+      playNotificationSound();
+      setNewItemHighlights(prev => {
+        const next = new Map(prev);
+        const expiry = now + NEW_ITEM_TTL_MS;
+        for (const id of addedItemIds) next.set(id, expiry);
+        return next;
+      });
+    }
   }, [orders]);
 
+  // ── Expire stale highlights every 5 s ───────────────────────────────────
   useEffect(() => {
-    const t = setInterval(() => setTick(x => x + 1), 30000);
+    const t = setInterval(() => {
+      setNewItemHighlights(prev => {
+        const now = Date.now();
+        if ([...prev.values()].every(exp => exp > now)) return prev; // nothing to remove
+        const next = new Map([...prev].filter(([, exp]) => exp > now));
+        return next;
+      });
+      setTick(x => x + 1); // keep elapsed timers updating
+    }, 5000);
     return () => clearInterval(t);
   }, []);
 
@@ -71,6 +137,13 @@ export default function Kitchen() {
       { onSuccess: () => qc.invalidateQueries({ queryKey: getListOrdersQueryKey({ status: ACTIVE_STATUSES }) }) }
     );
   };
+
+  // Build a flat Set of currently-highlighted item IDs for quick lookup
+  const highlightedItemIds = new Set<number>(
+    [...newItemHighlights.entries()]
+      .filter(([, exp]) => exp > Date.now())
+      .map(([id]) => id)
+  );
 
   // Split by item-level types — a mixed order appears in both columns
   const dineIn   = sortOrders(orders.filter(o => o.items.some(i => i.itemOrderType === "dine_in")));
@@ -87,7 +160,7 @@ export default function Kitchen() {
           <div>
             <h1 className="text-lg font-bold text-foreground leading-tight">Kitchen Display</h1>
             <p className="text-xs text-muted-foreground">
-              Current Active Orders:&nbsp;
+              Active Orders:&nbsp;
               <span className="font-bold text-foreground">{orders.length}</span>
             </p>
           </div>
@@ -109,7 +182,6 @@ export default function Kitchen() {
           <p className="text-sm">Waiting for new orders…</p>
         </div>
       ) : (
-        /* Two-column split: Dine In | Takeaway */
         <div className="grid grid-cols-1 md:grid-cols-2 min-h-[calc(100vh-72px)]">
 
           {/* ── Dine In ─────────────────────────────────── */}
@@ -133,6 +205,7 @@ export default function Kitchen() {
                   key={order.id}
                   order={order}
                   filterType="dine_in"
+                  highlightedItemIds={highlightedItemIds}
                   onPrepare={() => changeStatus(order.id, "preparing")}
                   onReady={() => changeStatus(order.id, "ready")}
                 />
@@ -161,6 +234,7 @@ export default function Kitchen() {
                   key={order.id}
                   order={order}
                   filterType="takeaway"
+                  highlightedItemIds={highlightedItemIds}
                   onPrepare={() => changeStatus(order.id, "preparing")}
                   onReady={() => changeStatus(order.id, "ready")}
                 />
@@ -177,11 +251,13 @@ export default function Kitchen() {
 function KitchenCard({
   order,
   filterType,
+  highlightedItemIds,
   onPrepare,
   onReady,
 }: {
   order: Order;
   filterType: "dine_in" | "takeaway";
+  highlightedItemIds: Set<number>;
   onPrepare: () => void;
   onReady: () => void;
 }) {
@@ -196,15 +272,19 @@ function KitchenCard({
   const isMixed = order.items.some(i => i.itemOrderType === "dine_in") &&
                   order.items.some(i => i.itemOrderType !== "dine_in");
 
+  // Flag: this card has at least one newly-added item (drives "UPDATED" banner)
+  const hasNewItems = visibleItems.some(i => highlightedItemIds.has(i.id));
+
   return (
     <div
       className={cn(
         "border rounded-2xl p-4 space-y-3 transition-all",
         meta.cardBorder,
-        order.priority && "ring-2 ring-amber-500/40"
+        order.priority && "ring-2 ring-amber-500/40",
+        hasNewItems && "ring-2 ring-orange-400/60 animate-pulse-once"
       )}
     >
-      {/* Top row: status badge + order number + elapsed */}
+      {/* Top row: badges + order number + elapsed */}
       <div className="flex items-center gap-2 flex-wrap">
         {order.priority && (
           <span className="flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-full">
@@ -218,6 +298,11 @@ function KitchenCard({
         {isMixed && (
           <span className="text-xs font-semibold text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full">
             Mixed order
+          </span>
+        )}
+        {hasNewItems && (
+          <span className="flex items-center gap-1 text-xs font-bold text-orange-400 bg-orange-500/15 border border-orange-500/30 px-2 py-0.5 rounded-full">
+            <Sparkles size={11} /> UPDATED
           </span>
         )}
         <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
@@ -239,16 +324,34 @@ function KitchenCard({
         </p>
       </div>
 
-      {/* Items — only the relevant type for this column */}
+      {/* Items — only the relevant type, new items highlighted */}
       <div className="space-y-1 border-t border-border/40 pt-3">
-        {visibleItems.map(item => (
-          <div key={item.id} className="flex items-baseline justify-between gap-2">
-            <span className="text-base font-medium text-foreground leading-snug">
-              {item.productName}
-            </span>
-            <span className="text-xl font-black text-primary shrink-0">×{item.quantity}</span>
-          </div>
-        ))}
+        {visibleItems.map(item => {
+          const isNew = highlightedItemIds.has(item.id);
+          return (
+            <div
+              key={item.id}
+              className={cn(
+                "flex items-center justify-between gap-2 rounded-lg px-2 py-1 -mx-2 transition-colors",
+                isNew && "bg-orange-500/12 border border-orange-500/25"
+              )}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                {isNew && (
+                  <span className="flex items-center gap-0.5 text-[10px] font-black text-orange-400 bg-orange-500/20 px-1.5 py-0.5 rounded shrink-0 uppercase tracking-wide">
+                    <Sparkles size={9} /> NEW
+                  </span>
+                )}
+                <span className={cn("text-base font-medium text-foreground leading-snug", isNew && "font-bold")}>
+                  {item.productName}
+                </span>
+              </div>
+              <span className={cn("text-xl font-black shrink-0", isNew ? "text-orange-400" : "text-primary")}>
+                ×{item.quantity}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       {/* Notes */}
@@ -258,7 +361,7 @@ function KitchenCard({
         </div>
       )}
 
-      {/* Action buttons — kitchen only does Prepare & Ready */}
+      {/* Action buttons */}
       <div className="pt-1">
         {order.status === "approved" && (
           <button
