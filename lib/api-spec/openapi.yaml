@@ -549,6 +549,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/Payment"
 
+  /orders/{id}/payment/void:
+    post:
+      operationId: voidOrderPayment
+      tags: [orders]
+      summary: Void (nullify) a payment — zeros all amounts and marks as voided
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Payment voided
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "404":
+          description: Payment not found
+
   # ── Customers ────────────────────────────────────────────────────────────────
   /customers:
     get:

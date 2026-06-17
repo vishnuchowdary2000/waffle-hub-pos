@@ -626,6 +626,27 @@ export const UpdateOrderPaymentResponse = zod.object({
 })
 
 
+/**
+ * @summary Void (nullify) a payment — zeros all amounts and marks as voided
+ */
+export const VoidOrderPaymentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const VoidOrderPaymentResponse = zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "totalAmount": zod.number(),
+  "cashAmount": zod.number(),
+  "upiAmount": zod.number(),
+  "cardAmount": zod.number(),
+  "totalPaid": zod.number(),
+  "balance": zod.number().optional(),
+  "status": zod.string(),
+  "createdAt": zod.string()
+})
+
+
 export const ListCustomersQueryParams = zod.object({
   "search": zod.coerce.string().optional()
 })

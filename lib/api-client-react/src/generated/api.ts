@@ -1986,6 +1986,76 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getUpdateOrderPaymentMutationOptions(options));
     }
 
+export const getVoidOrderPaymentUrl = (id: number,) => {
+
+
+
+
+  return `/api/orders/${id}/payment/void`
+}
+
+/**
+ * @summary Void (nullify) a payment — zeros all amounts and marks as voided
+ */
+export const voidOrderPayment = async (id: number, options?: RequestInit): Promise<Payment> => {
+
+  return customFetch<Payment>(getVoidOrderPaymentUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getVoidOrderPaymentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof voidOrderPayment>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof voidOrderPayment>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['voidOrderPayment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof voidOrderPayment>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  voidOrderPayment(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VoidOrderPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof voidOrderPayment>>>
+
+    export type VoidOrderPaymentMutationError = ErrorType<void>
+
+    /**
+ * @summary Void (nullify) a payment — zeros all amounts and marks as voided
+ */
+export const useVoidOrderPayment = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof voidOrderPayment>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof voidOrderPayment>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getVoidOrderPaymentMutationOptions(options));
+    }
+
 export const getListCustomersUrl = (params?: ListCustomersParams,) => {
   const normalizedParams = new URLSearchParams();
 

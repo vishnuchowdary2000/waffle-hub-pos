@@ -40,6 +40,11 @@ function PaymentBadge({ payment, totalAmount }: {
       ✓ PAID
     </span>
   );
+  if (payment.status === "voided") return (
+    <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-muted text-muted-foreground border border-border whitespace-nowrap">
+      VOIDED
+    </span>
+  );
   return (
     <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-amber-500/15 text-amber-400 border border-amber-500/25 whitespace-nowrap">
       ₹{payment.balance?.toFixed(0)} DUE
@@ -188,6 +193,15 @@ export default function Dashboard() {
                       className="p-1.5 rounded-lg bg-secondary hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors">
                       <Trash2 size={14} />
                     </button>
+                  </div>
+                )}
+                {/* Cancelled orders with a non-voided payment — show link to void */}
+                {order.status === "cancelled" && order.payment && order.payment.status !== "voided" && (order.payment.totalPaid ?? 0) > 0 && (
+                  <div className="shrink-0">
+                    <Link href={`/billing/${order.id}`}
+                      className="text-xs px-3 py-1.5 rounded-lg font-bold bg-destructive/15 text-destructive hover:bg-destructive/25 transition-colors border border-destructive/30">
+                      Void
+                    </Link>
                   </div>
                 )}
               </div>

@@ -6,6 +6,7 @@ import {
   useCreateOrderPayment,
   useUpdateOrderPayment,
   useUpdateOrderStatus,
+  useVoidOrderPayment,
   getGetOrderQueryKey,
   getGetOrderPaymentQueryKey,
   getListOrdersQueryKey,
@@ -14,7 +15,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatTime, STATUS_LABELS, ORDER_TYPE_LABELS } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, CheckCircle, Banknote, Smartphone, CreditCard, Phone, ShoppingBag, UtensilsCrossed } from "lucide-react";
+import { ArrowLeft, CheckCircle, Banknote, Smartphone, CreditCard, Phone, ShoppingBag, UtensilsCrossed, XCircle, AlertTriangle } from "lucide-react";
 
 const statusClass: Record<string, string> = {
   pending_payment: "status-pending_payment",
@@ -42,6 +43,7 @@ export default function Billing() {
   const createPayment = useCreateOrderPayment();
   const updatePayment = useUpdateOrderPayment();
   const updateStatus = useUpdateOrderStatus();
+  const voidPayment = useVoidOrderPayment();
 
   const [cash, setCash] = useState("0");
   const [upi, setUpi] = useState("0");
@@ -179,8 +181,70 @@ export default function Billing() {
         </div>
       </div>
 
-      {/* Payment entry */}
-      <div className="bg-card border border-card-border rounded-xl p-5 space-y-4">
+      {/* ── Void Payment — shown only for cancelled orders with a live payment ── */}
+      {order.status === "cancelled" && existingPayment && existingPayment.status !== "voided" && existingPayment.totalPaid > 0 && (
+        <div className="bg-destructive/8 border border-destructive/25 rounded-xl p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={18} className="text-destructive mt-0.5 shrink-0" />
+            <div>
+              <h2 className="text-base font-bold text-foreground">Payment Nullification</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                This order was cancelled after a payment of{" "}
+                <span className="font-semibold text-foreground">{formatCurrency(existingPayment.totalPaid)}</span> was recorded.
+                Voiding will zero out all payment amounts and mark this as refunded.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-lg px-4 py-3 space-y-1.5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Cash</span>
+              <span className="font-medium">{formatCurrency(existingPayment.cashAmount)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">UPI</span>
+              <span className="font-medium">{formatCurrency(existingPayment.upiAmount)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Card</span>
+              <span className="font-medium">{formatCurrency(existingPayment.cardAmount)}</span>
+            </div>
+            <div className="flex justify-between border-t border-border/50 pt-1.5 font-bold">
+              <span>Total Paid</span>
+              <span className="text-green-400">{formatCurrency(existingPayment.totalPaid)}</span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => voidPayment.mutate({ id: orderId }, {
+              onSuccess: () => {
+                qc.invalidateQueries({ queryKey: getGetOrderPaymentQueryKey(orderId) });
+                qc.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+                qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+              },
+            })}
+            disabled={voidPayment.isPending}
+            className="w-full py-3.5 rounded-xl text-sm font-bold bg-destructive text-destructive-foreground hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
+          >
+            <XCircle size={16} />
+            {voidPayment.isPending ? "Voiding…" : "Void Payment (Nullify ₹" + existingPayment.totalPaid.toFixed(0) + ")"}
+          </button>
+        </div>
+      )}
+
+      {/* Voided confirmation */}
+      {order.status === "cancelled" && existingPayment?.status === "voided" && (
+        <div className="bg-secondary/50 border border-border rounded-xl px-5 py-4 flex items-center gap-3">
+          <XCircle size={18} className="text-muted-foreground shrink-0" />
+          <div>
+            <p className="text-sm font-bold text-foreground">Payment Voided</p>
+            <p className="text-xs text-muted-foreground mt-0.5">All payment amounts have been nullified. No funds are recorded against this order.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Payment entry — hidden for cancelled orders */}
+      {order.status !== "cancelled" && <div className="bg-card border border-card-border rounded-xl p-5 space-y-4">
         <h2 className="text-base font-bold text-foreground">Collect Payment</h2>
 
         <PaymentField
@@ -244,7 +308,7 @@ export default function Billing() {
             </span>
           ) : "Save Partial Payment"}
         </button>
-      </div>
+      </div>}
     </div>
   );
 }

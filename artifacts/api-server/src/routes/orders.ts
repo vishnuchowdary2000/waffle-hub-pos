@@ -334,6 +334,33 @@ router.delete("/orders/:id/items/:itemId", async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
+// Void payment — zero all amounts, mark as voided
+router.post("/orders/:id/payment/void", async (req, res): Promise<void> => {
+  const params = GetOrderPaymentParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+
+  const [existing] = await db.select().from(paymentsTable).where(eq(paymentsTable.orderId, params.data.id));
+  if (!existing) { res.status(404).json({ error: "Payment not found" }); return; }
+
+  const [payment] = await db.update(paymentsTable).set({
+    cashAmount: "0",
+    upiAmount: "0",
+    cardAmount: "0",
+    status: "voided",
+  }).where(eq(paymentsTable.orderId, params.data.id)).returning();
+
+  res.json({
+    ...payment,
+    totalAmount: Number(payment.totalAmount),
+    cashAmount: 0,
+    upiAmount: 0,
+    cardAmount: 0,
+    totalPaid: 0,
+    balance: Number(payment.totalAmount),
+    createdAt: payment.createdAt.toISOString(),
+  });
+});
+
 // Get payment
 router.get("/orders/:id/payment", async (req, res): Promise<void> => {
   const params = GetOrderPaymentParams.safeParse(req.params);
