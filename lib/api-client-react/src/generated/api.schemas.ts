@@ -151,6 +151,12 @@ export interface OrderStatusUpdate {
   status: string;
 }
 
+export interface ReplaceOrderItemsInput {
+  /** @nullable */
+  notes?: string | null;
+  items: OrderItemInput[];
+}
+
 export interface OrderItemUpdate {
   /** @minimum 1 */
   quantity?: number;

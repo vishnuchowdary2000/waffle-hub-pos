@@ -394,6 +394,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OrderItem"
+    put:
+      operationId: replaceOrderItems
+      tags: [orders]
+      summary: Atomically replace all items in an active order (pending_payment, approved, or preparing)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplaceOrderItemsInput"
+      responses:
+        "200":
+          description: Updated order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "409":
+          description: Order not in editable status
 
   /orders/{id}/items/{itemId}:
     patch:
@@ -921,6 +946,17 @@ components:
         quantity:      { type: integer }
         itemOrderType: { type: string }
         notes:         { type: ["string", "null"] }
+
+    ReplaceOrderItemsInput:
+      type: object
+      required: [items]
+      properties:
+        notes:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItemInput"
 
     OrderItemInput:
       type: object

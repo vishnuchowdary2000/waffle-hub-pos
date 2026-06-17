@@ -55,6 +55,7 @@ import type {
   ProductUpdate,
   PublicMenuCategory,
   PublicStats,
+  ReplaceOrderItemsInput,
   User,
   UserInput,
   UserUpdate
@@ -1488,6 +1489,78 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getAddOrderItemMutationOptions(options));
+    }
+
+export const getReplaceOrderItemsUrl = (id: number,) => {
+
+
+
+
+  return `/api/orders/${id}/items`
+}
+
+/**
+ * @summary Atomically replace all items in an active order (pending_payment, approved, or preparing)
+ */
+export const replaceOrderItems = async (id: number,
+    replaceOrderItemsInput: ReplaceOrderItemsInput, options?: RequestInit): Promise<Order> => {
+
+  return customFetch<Order>(getReplaceOrderItemsUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      replaceOrderItemsInput,)
+  }
+);}
+
+
+
+
+export const getReplaceOrderItemsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof replaceOrderItems>>, TError,{id: number;data: BodyType<ReplaceOrderItemsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof replaceOrderItems>>, TError,{id: number;data: BodyType<ReplaceOrderItemsInput>}, TContext> => {
+
+const mutationKey = ['replaceOrderItems'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof replaceOrderItems>>, {id: number;data: BodyType<ReplaceOrderItemsInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  replaceOrderItems(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReplaceOrderItemsMutationResult = NonNullable<Awaited<ReturnType<typeof replaceOrderItems>>>
+    export type ReplaceOrderItemsMutationBody = BodyType<ReplaceOrderItemsInput>
+    export type ReplaceOrderItemsMutationError = ErrorType<void>
+
+    /**
+ * @summary Atomically replace all items in an active order (pending_payment, approved, or preparing)
+ */
+export const useReplaceOrderItems = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof replaceOrderItems>>, TError,{id: number;data: BodyType<ReplaceOrderItemsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof replaceOrderItems>>,
+        TError,
+        {id: number;data: BodyType<ReplaceOrderItemsInput>},
+        TContext
+      > => {
+      return useMutation(getReplaceOrderItemsMutationOptions(options));
     }
 
 export const getUpdateOrderItemUrl = (id: number,

@@ -42,6 +42,7 @@ export * from './productUpdate';
 export * from './publicMenuCategory';
 export * from './publicMenuProduct';
 export * from './publicStats';
+export * from './replaceOrderItemsInput';
 export * from './user';
 export * from './userInput';
 export * from './userUpdate';

@@ -20,7 +20,10 @@ import {
   UpdateOrderPaymentParams,
   UpdateOrderPaymentBody,
   ListOrdersQueryParams,
+  ReplaceOrderItemsBody,
 } from "@workspace/api-zod";
+
+const EDITABLE_STATUSES = ["pending_payment", "approved", "preparing"];
 
 const router: IRouter = Router();
 
@@ -243,6 +246,48 @@ router.post("/orders/:id/items", async (req, res): Promise<void> => {
   await db.update(ordersTable).set({ totalAmount: String(total) }).where(eq(ordersTable.id, params.data.id));
 
   res.status(201).json({ ...item, price: Number(item.price) });
+});
+
+// Replace all items in an active order (atomic edit)
+router.put("/orders/:id/items", async (req, res): Promise<void> => {
+  const params = GetOrderParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+  const parsed = ReplaceOrderItemsBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, params.data.id));
+  if (!order) { res.status(404).json({ error: "Order not found" }); return; }
+  if (!EDITABLE_STATUSES.includes(order.status)) {
+    res.status(409).json({ error: `Cannot edit order in status: ${order.status}` });
+    return;
+  }
+
+  // Atomically replace all items
+  await db.delete(orderItemsTable).where(eq(orderItemsTable.orderId, params.data.id));
+
+  let total = 0;
+  if (parsed.data.items.length > 0) {
+    await db.insert(orderItemsTable).values(
+      parsed.data.items.map(item => ({
+        orderId: params.data.id,
+        productId: item.productId ?? null,
+        productName: item.productName,
+        price: String(item.price),
+        quantity: item.quantity,
+        itemOrderType: item.itemOrderType ?? "dine_in",
+        notes: item.notes ?? null,
+      }))
+    );
+    total = parsed.data.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  }
+
+  // Update total and notes
+  const updateData: Record<string, unknown> = { totalAmount: String(total) };
+  if (parsed.data.notes !== undefined) updateData.notes = parsed.data.notes;
+  await db.update(ordersTable).set(updateData).where(eq(ordersTable.id, params.data.id));
+
+  const full = await getFullOrder(params.data.id);
+  res.json(full);
 });
 
 // Update order item

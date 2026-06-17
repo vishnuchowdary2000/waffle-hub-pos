@@ -455,6 +455,68 @@ export const AddOrderItemBody = zod.object({
 })
 
 
+/**
+ * @summary Atomically replace all items in an active order (pending_payment, approved, or preparing)
+ */
+export const ReplaceOrderItemsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+
+export const ReplaceOrderItemsBody = zod.object({
+  "notes": zod.string().nullish(),
+  "items": zod.array(zod.object({
+  "productId": zod.number().nullish(),
+  "productName": zod.string().min(1),
+  "price": zod.number(),
+  "quantity": zod.number().min(1),
+  "itemOrderType": zod.string().optional(),
+  "notes": zod.string().optional()
+}))
+})
+
+export const ReplaceOrderItemsResponse = zod.object({
+  "id": zod.number(),
+  "orderNumber": zod.string(),
+  "customerId": zod.number().nullish(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string().nullish(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "notes": zod.string().nullish(),
+  "priority": zod.boolean().optional(),
+  "totalAmount": zod.number(),
+  "createdAt": zod.string(),
+  "readyTime": zod.string(),
+  "updatedAt": zod.string().optional(),
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "productId": zod.number().nullish(),
+  "productName": zod.string(),
+  "price": zod.number(),
+  "quantity": zod.number(),
+  "itemOrderType": zod.string(),
+  "notes": zod.string().nullish()
+})),
+  "payment": zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "totalAmount": zod.number(),
+  "cashAmount": zod.number(),
+  "upiAmount": zod.number(),
+  "cardAmount": zod.number(),
+  "totalPaid": zod.number(),
+  "balance": zod.number().optional(),
+  "status": zod.string(),
+  "createdAt": zod.string()
+}).optional()
+})
+
+
 export const UpdateOrderItemParams = zod.object({
   "id": zod.coerce.number(),
   "itemId": zod.coerce.number()

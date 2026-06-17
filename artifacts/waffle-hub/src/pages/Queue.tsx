@@ -19,7 +19,9 @@ import {
   RefreshCw,
   ClipboardList,
   AlertCircle,
+  Pencil,
 } from "lucide-react";
+import EditOrderModal from "./EditOrderModal";
 
 const ACTIVE_STATUSES = "pending_payment,approved,preparing,ready";
 
@@ -67,6 +69,7 @@ export default function Queue() {
   const [, navigate] = useLocation();
   const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
   const [confirmCancel, setConfirmCancel] = useState<number | null>(null);
+  const [editOrderId, setEditOrderId] = useState<number | null>(null);
 
   const { data: orders = [], isLoading, dataUpdatedAt } = useListOrders(
     { status: ACTIVE_STATUSES },
@@ -320,6 +323,18 @@ export default function Queue() {
                       </button>
                     )}
 
+                    {/* Edit Order — only for pending_payment, approved, preparing */}
+                    {["pending_payment", "approved", "preparing"].includes(order.status) && (
+                      <button
+                        onClick={() => setEditOrderId(order.id)}
+                        disabled={isBusy}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground border border-border rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+                      >
+                        <Pencil size={13} />
+                        Edit
+                      </button>
+                    )}
+
                     {/* Mark Complete (ready orders) */}
                     {order.status === "ready" && (
                       <button
@@ -354,6 +369,17 @@ export default function Queue() {
           </div>
         )}
       </div>
+
+      {/* Edit Order modal */}
+      {editOrderId !== null && (() => {
+        const editOrder = orders.find(o => o.id === editOrderId);
+        return editOrder ? (
+          <EditOrderModal
+            order={editOrder}
+            onClose={() => setEditOrderId(null)}
+          />
+        ) : null;
+      })()}
 
       {/* Cancel confirm modal */}
       {confirmCancel !== null && (
