@@ -145,9 +145,9 @@ export default function Kitchen() {
       .map(([id]) => id)
   );
 
-  // Split by item-level types — a mixed order appears in both columns
-  const dineIn   = sortOrders(orders.filter(o => o.items.some(i => i.itemOrderType === "dine_in")));
-  const takeaway = sortOrders(orders.filter(o => o.items.some(i => i.itemOrderType !== "dine_in")));
+  // Split by order-level type — each order belongs to exactly ONE column
+  const dineIn   = sortOrders(orders.filter(o => o.orderType === "dine_in"));
+  const takeaway = sortOrders(orders.filter(o => o.orderType !== "dine_in"));
 
   return (
     <div className="min-h-screen bg-background">
@@ -204,7 +204,6 @@ export default function Kitchen() {
                 <KitchenCard
                   key={order.id}
                   order={order}
-                  filterType="dine_in"
                   highlightedItemIds={highlightedItemIds}
                   onPrepare={() => changeStatus(order.id, "preparing")}
                   onReady={() => changeStatus(order.id, "ready")}
@@ -233,7 +232,6 @@ export default function Kitchen() {
                 <KitchenCard
                   key={order.id}
                   order={order}
-                  filterType="takeaway"
                   highlightedItemIds={highlightedItemIds}
                   onPrepare={() => changeStatus(order.id, "preparing")}
                   onReady={() => changeStatus(order.id, "ready")}
@@ -248,29 +246,28 @@ export default function Kitchen() {
   );
 }
 
+const ORDER_TYPE_LABEL: Record<string, { label: string; icon: React.ReactNode }> = {
+  dine_in:  { label: "Dine In",  icon: <UtensilsCrossed size={11} /> },
+  takeaway: { label: "Takeaway", icon: <ShoppingBag size={11} /> },
+  delivery: { label: "Delivery", icon: <ShoppingBag size={11} /> },
+};
+
 function KitchenCard({
   order,
-  filterType,
   highlightedItemIds,
   onPrepare,
   onReady,
 }: {
   order: Order;
-  filterType: "dine_in" | "takeaway";
   highlightedItemIds: Set<number>;
   onPrepare: () => void;
   onReady: () => void;
 }) {
   const meta = STATUS_META[order.status] ?? STATUS_META.approved;
+  const orderTypeInfo = ORDER_TYPE_LABEL[order.orderType] ?? ORDER_TYPE_LABEL.dine_in;
 
-  // Show only items relevant to this column
-  const visibleItems = order.items.filter(item =>
-    filterType === "dine_in" ? item.itemOrderType === "dine_in" : item.itemOrderType !== "dine_in"
-  );
-
-  // Flag: this order also has items in the other column
-  const isMixed = order.items.some(i => i.itemOrderType === "dine_in") &&
-                  order.items.some(i => i.itemOrderType !== "dine_in");
+  // Show ALL items for this order — column assignment is by order type, not item type
+  const visibleItems = order.items;
 
   // Flag: this card has at least one newly-added item (drives "UPDATED" banner)
   const hasNewItems = visibleItems.some(i => highlightedItemIds.has(i.id));
@@ -295,11 +292,6 @@ function KitchenCard({
           {meta.label}
         </span>
         <span className="font-mono text-xs text-muted-foreground">{order.orderNumber}</span>
-        {isMixed && (
-          <span className="text-xs font-semibold text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full">
-            Mixed order
-          </span>
-        )}
         {hasNewItems && (
           <span className="flex items-center gap-1 text-xs font-bold text-orange-400 bg-orange-500/15 border border-orange-500/30 px-2 py-0.5 rounded-full">
             <Sparkles size={11} /> UPDATED
@@ -317,14 +309,11 @@ function KitchenCard({
           {order.customerName}
         </p>
         <p className="text-xs text-muted-foreground mt-0.5">
-          {filterType === "dine_in"
-            ? <span className="flex items-center gap-1"><UtensilsCrossed size={11} /> Dine In portion</span>
-            : <span className="flex items-center gap-1"><ShoppingBag size={11} /> Takeaway portion</span>
-          }
+          <span className="flex items-center gap-1">{orderTypeInfo.icon} {orderTypeInfo.label}</span>
         </p>
       </div>
 
-      {/* Items — only the relevant type, new items highlighted */}
+      {/* Items */}
       <div className="space-y-1 border-t border-border/40 pt-3">
         {visibleItems.map(item => {
           const isNew = highlightedItemIds.has(item.id);
