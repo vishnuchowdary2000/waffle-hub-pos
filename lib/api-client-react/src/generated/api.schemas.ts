@@ -347,6 +347,47 @@ export interface PublicStats {
   rushLevel: string;
 }
 
+export type StoreStatusAnnouncementsItem = {
+  id: number;
+  message: string;
+};
+
+export interface StoreStatus {
+  isOpen: boolean;
+  openTime: string;
+  closeTime: string;
+  announcements: StoreStatusAnnouncementsItem[];
+}
+
+export interface StoreSettings {
+  manualOverride: boolean;
+  isOpen: boolean;
+  openTime: string;
+  closeTime: string;
+  updatedAt: string;
+}
+
+export interface StoreSettingsInput {
+  manualOverride?: boolean;
+  isOpen?: boolean;
+  openTime?: string;
+  closeTime?: string;
+}
+
+export interface StoreAnnouncement {
+  id: number;
+  message: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StoreAnnouncementInput {
+  /** @minLength 1 */
+  message: string;
+  enabled?: boolean;
+}
+
 export interface OrderTrackingResult {
   id: number;
   orderNumber: string;

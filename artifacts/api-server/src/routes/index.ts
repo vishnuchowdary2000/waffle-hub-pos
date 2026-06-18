@@ -10,10 +10,12 @@ import reportsRouter from "./reports";
 import authRouter, { seedDefaultUsers } from "./auth";
 import usersRouter from "./users";
 import publicRouter from "./public";
+import storeRouter from "./store";
 
 const router: IRouter = Router();
 
 router.use(publicRouter);
+router.use(storeRouter);
 router.use(authRouter);
 router.use(healthRouter);
 router.use(categoriesRouter);

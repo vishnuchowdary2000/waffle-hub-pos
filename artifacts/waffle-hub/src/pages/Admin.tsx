@@ -11,11 +11,19 @@ import {
   useCreateUser,
   useUpdateUser,
   useDeleteUser,
+  useGetStoreSettings,
+  useUpdateStoreSettings,
+  useListStoreAnnouncements,
+  useCreateStoreAnnouncement,
+  useUpdateStoreAnnouncement,
+  useDeleteStoreAnnouncement,
   getListCustomersQueryKey,
   getListExpensesQueryKey,
   getGetDailyReportQueryKey,
   getGetProductReportQueryKey,
   getListUsersQueryKey,
+  getGetStoreSettingsQueryKey,
+  getListStoreAnnouncementsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -26,9 +34,10 @@ import {
   Plus, RefreshCw, Eraser,
   TrendingUp, TrendingDown, ShieldCheck,
   UserCog, KeyRound, ToggleLeft, ToggleRight, ChefHat, ShoppingBag,
+  Store, Megaphone, Clock, Check, Pencil,
 } from "lucide-react";
 
-type Tab = "customers" | "expenses" | "reports" | "users";
+type Tab = "customers" | "expenses" | "reports" | "users" | "store";
 
 const ROLE_META: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   admin:   { label: "Admin",   color: "text-amber-400 bg-amber-500/10 border-amber-500/30",   icon: ShieldCheck },
@@ -58,6 +67,7 @@ export default function Admin() {
             { key: "customers", label: "Customers", icon: Users },
             { key: "expenses",  label: "Expenses",  icon: Receipt },
             { key: "reports",   label: "Reports",   icon: BarChart3 },
+            { key: "store",     label: "Store",     icon: Store },
           ] as { key: Tab; label: string; icon: React.ElementType }[]).map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -81,6 +91,7 @@ export default function Admin() {
         {tab === "customers" && <CustomersTab />}
         {tab === "expenses"  && <ExpensesTab />}
         {tab === "reports"   && <ReportsTab />}
+        {tab === "store"     && <StoreTab />}
       </div>
     </div>
   );
@@ -692,6 +703,344 @@ function UsersTab() {
           confirmLabel="Delete User"
           onCancel={() => setConfirmDeleteId(null)}
           onConfirm={() => doDelete(confirmDeleteId)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ── Store Tab ──────────────────────────────────────────────────────────────── */
+
+function StoreTab() {
+  const qc = useQueryClient();
+
+  // Settings
+  const { data: settings, isLoading: settingsLoading } = useGetStoreSettings({
+    query: { queryKey: getGetStoreSettingsQueryKey() },
+  });
+  const updateSettings = useUpdateStoreSettings();
+
+  const [openTime, setOpenTime] = useState("");
+  const [closeTime, setCloseTime] = useState("");
+  const [timingsSaved, setTimingsSaved] = useState(false);
+
+  // Sync local time inputs when settings load
+  const loadedOpenTime = settings?.openTime ?? "";
+  const loadedCloseTime = settings?.closeTime ?? "";
+
+  const effectiveOpenTime = openTime || loadedOpenTime;
+  const effectiveCloseTime = closeTime || loadedCloseTime;
+
+  const saveTimings = () => {
+    updateSettings.mutate(
+      { data: { openTime: effectiveOpenTime, closeTime: effectiveCloseTime } },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getGetStoreSettingsQueryKey() });
+          setTimingsSaved(true);
+          setTimeout(() => setTimingsSaved(false), 2000);
+        },
+      }
+    );
+  };
+
+  const setManualStatus = (isOpen: boolean) => {
+    updateSettings.mutate(
+      { data: { manualOverride: true, isOpen } },
+      { onSuccess: () => qc.invalidateQueries({ queryKey: getGetStoreSettingsQueryKey() }) }
+    );
+  };
+
+  const clearManualOverride = () => {
+    updateSettings.mutate(
+      { data: { manualOverride: false } },
+      { onSuccess: () => qc.invalidateQueries({ queryKey: getGetStoreSettingsQueryKey() }) }
+    );
+  };
+
+  // Announcements
+  const { data: announcements = [], isLoading: annLoading } = useListStoreAnnouncements({
+    query: { queryKey: getListStoreAnnouncementsQueryKey() },
+  });
+  const createAnn = useCreateStoreAnnouncement();
+  const updateAnn = useUpdateStoreAnnouncement();
+  const deleteAnn = useDeleteStoreAnnouncement();
+
+  const [newMessage, setNewMessage] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editMessage, setEditMessage] = useState("");
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+
+  const handleCreateAnn = () => {
+    if (!newMessage.trim()) return;
+    createAnn.mutate(
+      { data: { message: newMessage.trim(), enabled: true } },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getListStoreAnnouncementsQueryKey() });
+          setNewMessage("");
+        },
+      }
+    );
+  };
+
+  const handleUpdateAnn = (id: number) => {
+    updateAnn.mutate(
+      { id, data: { message: editMessage.trim() } },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getListStoreAnnouncementsQueryKey() });
+          setEditingId(null);
+        },
+      }
+    );
+  };
+
+  const handleToggleEnabled = (id: number, enabled: boolean, currentMessage: string) => {
+    updateAnn.mutate(
+      { id, data: { message: currentMessage, enabled } },
+      { onSuccess: () => qc.invalidateQueries({ queryKey: getListStoreAnnouncementsQueryKey() }) }
+    );
+  };
+
+  const handleDeleteAnn = (id: number) => {
+    deleteAnn.mutate(
+      { id },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getListStoreAnnouncementsQueryKey() });
+          setDeleteConfirmId(null);
+        },
+      }
+    );
+  };
+
+  if (settingsLoading) {
+    return <div className="flex justify-center py-16"><RefreshCw className="animate-spin text-primary" size={28} /></div>;
+  }
+
+  return (
+    <div className="p-4 md:p-6 space-y-6 max-w-2xl">
+
+      {/* ── Store Status ──── */}
+      <div className="bg-card border border-card-border rounded-xl p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Store size={16} className="text-primary" />
+          <h2 className="font-semibold text-foreground">Store Status</h2>
+        </div>
+
+        {/* Current computed status */}
+        <div className={cn(
+          "flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-semibold",
+          settings?.isOpen
+            ? "bg-green-500/10 border-green-500/25 text-green-400"
+            : "bg-red-500/10 border-red-500/25 text-red-400"
+        )}>
+          <span className={cn("w-2.5 h-2.5 rounded-full", settings?.isOpen ? "bg-green-400" : "bg-red-400")} />
+          {settings?.isOpen ? "🟢 Store is Open" : "🔴 Store is Closed"}
+          {settings?.manualOverride && (
+            <span className="ml-1 text-xs font-normal text-muted-foreground">(manual override active)</span>
+          )}
+        </div>
+
+        {/* Manual override buttons */}
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Manual Override</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setManualStatus(true)}
+              disabled={updateSettings.isPending}
+              className="flex items-center gap-2 px-4 py-2.5 bg-green-500/15 hover:bg-green-500/25 text-green-400 border border-green-500/30 rounded-lg text-sm font-semibold transition-colors"
+            >
+              <ToggleRight size={15} /> Force Open
+            </button>
+            <button
+              onClick={() => setManualStatus(false)}
+              disabled={updateSettings.isPending}
+              className="flex items-center gap-2 px-4 py-2.5 bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/30 rounded-lg text-sm font-semibold transition-colors"
+            >
+              <ToggleLeft size={15} /> Force Closed
+            </button>
+            {settings?.manualOverride && (
+              <button
+                onClick={clearManualOverride}
+                disabled={updateSettings.isPending}
+                className="flex items-center gap-2 px-4 py-2.5 bg-secondary hover:bg-muted text-muted-foreground border border-border rounded-lg text-sm font-semibold transition-colors"
+              >
+                <RefreshCw size={14} /> Use Schedule
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Manual override takes priority over the schedule. Click "Use Schedule" to resume automatic timing.
+          </p>
+        </div>
+      </div>
+
+      {/* ── Opening Hours ──── */}
+      <div className="bg-card border border-card-border rounded-xl p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Clock size={16} className="text-primary" />
+          <h2 className="font-semibold text-foreground">Opening Hours</h2>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          When no manual override is active, the store automatically opens and closes based on these times (IST).
+        </p>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+              Opening Time
+            </label>
+            <input
+              type="time"
+              value={openTime || loadedOpenTime}
+              onChange={e => setOpenTime(e.target.value)}
+              className="w-full bg-secondary border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+              Closing Time
+            </label>
+            <input
+              type="time"
+              value={closeTime || loadedCloseTime}
+              onChange={e => setCloseTime(e.target.value)}
+              className="w-full bg-secondary border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+        </div>
+
+        <button
+          onClick={saveTimings}
+          disabled={updateSettings.isPending}
+          className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+        >
+          {timingsSaved
+            ? <><Check size={14} /> Saved!</>
+            : <><Clock size={14} /> Save Timings</>}
+        </button>
+      </div>
+
+      {/* ── Announcements ──── */}
+      <div className="bg-card border border-card-border rounded-xl p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Megaphone size={16} className="text-primary" />
+          <h2 className="font-semibold text-foreground">Announcements</h2>
+          <span className="ml-auto text-xs text-muted-foreground">{announcements.length} total</span>
+        </div>
+
+        {/* Add new */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block">
+            New Announcement
+          </label>
+          <textarea
+            value={newMessage}
+            onChange={e => setNewMessage(e.target.value)}
+            placeholder="e.g. Today's Special: Buy 2 Waffles Get 1 Free"
+            rows={2}
+            className="w-full bg-secondary border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+          />
+          <button
+            onClick={handleCreateAnn}
+            disabled={!newMessage.trim() || createAnn.isPending}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
+          >
+            <Plus size={14} /> Add Announcement
+          </button>
+        </div>
+
+        {/* List */}
+        {annLoading ? (
+          <div className="flex justify-center py-4"><RefreshCw className="animate-spin text-muted-foreground" size={18} /></div>
+        ) : announcements.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">No announcements yet</p>
+        ) : (
+          <div className="space-y-2">
+            {announcements.map(ann => (
+              <div key={ann.id} className={cn(
+                "border rounded-xl px-4 py-3 space-y-2 transition-colors",
+                ann.enabled
+                  ? "bg-amber-500/5 border-amber-500/25"
+                  : "bg-secondary border-border opacity-60"
+              )}>
+                {editingId === ann.id ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={editMessage}
+                      onChange={e => setEditMessage(e.target.value)}
+                      rows={2}
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleUpdateAnn(ann.id)}
+                        disabled={updateAnn.isPending}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-semibold hover:opacity-90"
+                      >
+                        <Check size={12} /> Save
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-secondary text-muted-foreground rounded-lg text-xs font-semibold hover:text-foreground"
+                      >
+                        <X size={12} /> Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-start gap-2">
+                      <Megaphone size={13} className={cn("shrink-0 mt-0.5", ann.enabled ? "text-amber-400" : "text-muted-foreground")} />
+                      <p className="text-sm text-foreground flex-1 leading-relaxed">{ann.message}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Enable/disable toggle */}
+                      <button
+                        onClick={() => handleToggleEnabled(ann.id, !ann.enabled, ann.message)}
+                        className={cn(
+                          "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors",
+                          ann.enabled
+                            ? "bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25"
+                            : "bg-secondary text-muted-foreground border-border hover:text-foreground"
+                        )}
+                      >
+                        {ann.enabled
+                          ? <><ToggleRight size={12} /> Active</>
+                          : <><ToggleLeft size={12} /> Inactive</>}
+                      </button>
+                      <button
+                        onClick={() => { setEditingId(ann.id); setEditMessage(ann.message); }}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-secondary text-muted-foreground border border-border hover:text-foreground transition-colors"
+                      >
+                        <Pencil size={11} /> Edit
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirmId(ann.id)}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-destructive/10 text-destructive border border-destructive/30 hover:bg-destructive/20 transition-colors ml-auto"
+                      >
+                        <Trash2 size={11} /> Remove
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Delete confirm modal */}
+      {deleteConfirmId !== null && (
+        <ConfirmModal
+          title="Remove Announcement"
+          description="This announcement will be permanently deleted and removed from the customer view."
+          confirmLabel="Remove"
+          onCancel={() => setDeleteConfirmId(null)}
+          onConfirm={() => handleDeleteAnn(deleteConfirmId)}
         />
       )}
     </div>

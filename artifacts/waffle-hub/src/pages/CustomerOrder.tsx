@@ -5,8 +5,10 @@ import {
   useGetPublicStats,
   useCreatePublicOrder,
   useLookupPublicCustomer,
+  useGetPublicStoreStatus,
   getLookupPublicCustomerQueryKey,
   getGetPublicStatsQueryKey,
+  getGetPublicStoreStatusQueryKey,
 } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
 import {
@@ -14,6 +16,7 @@ import {
   User, Phone, UtensilsCrossed, ShoppingBag,
   AlertCircle, CheckCircle2, Zap, Clock,
   ArrowRight, Trash2, RefreshCw, Star, History,
+  Megaphone, Ban,
 } from "lucide-react";
 
 type Step = "info" | "menu" | "confirm";
@@ -63,6 +66,11 @@ export default function CustomerOrder() {
   const { data: stats } = useGetPublicStats({
     query: { queryKey: getGetPublicStatsQueryKey(), refetchInterval: 10000 },
   });
+  const { data: storeStatus } = useGetPublicStoreStatus({
+    query: { queryKey: getGetPublicStoreStatusQueryKey(), refetchInterval: 30000 },
+  });
+  const storeClosed = storeStatus !== undefined && !storeStatus.isOpen;
+  const activeAnnouncements = storeStatus?.announcements ?? [];
   const createOrder = useCreatePublicOrder();
 
   const digits = phoneDigitCount(phone);
@@ -245,7 +253,53 @@ export default function CustomerOrder() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+
+        {/* Store closed banner */}
+        {storeClosed && (
+          <div className="flex gap-3 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-4">
+            <Ban size={18} className="text-red-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-bold text-red-400">We are currently closed</p>
+              <p className="text-xs text-red-400/80 mt-0.5">
+                Sorry, we are currently closed. Please visit us during business hours.
+              </p>
+              {storeStatus?.openTime && storeStatus?.closeTime && (
+                <p className="text-xs text-red-400/70 mt-1">
+                  Operating hours: {storeStatus.openTime} – {storeStatus.closeTime}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Active announcements */}
+        {activeAnnouncements.length > 0 && activeAnnouncements.map(a => (
+          <div key={a.id} className="flex gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
+            <Megaphone size={15} className="text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-sm text-amber-300 leading-relaxed">{a.message}</p>
+          </div>
+        ))}
+
+        {/* Store status pill */}
+        {storeStatus && (
+          <div className={cn(
+            "flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl border",
+            storeStatus.isOpen
+              ? "bg-green-500/10 border-green-500/25 text-green-400"
+              : "bg-red-500/10 border-red-500/25 text-red-400"
+          )}>
+            <span className={cn("w-2 h-2 rounded-full", storeStatus.isOpen ? "bg-green-400" : "bg-red-400")} />
+            {storeStatus.isOpen ? "Currently Accepting Orders" : "Currently Closed"}
+            {storeStatus.openTime && storeStatus.closeTime && (
+              <span className="ml-auto text-muted-foreground font-normal">
+                {storeStatus.openTime} – {storeStatus.closeTime}
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Rush bar */}
+        {!storeClosed && (
         <div className={cn("flex items-center justify-between rounded-xl border px-4 py-3 text-sm", rush.bg)}>
           <div className="flex items-center gap-2">
             <Zap size={14} className={rush.color} />
@@ -255,6 +309,7 @@ export default function CustomerOrder() {
             Preparing: <span className="font-bold text-foreground">{stats?.preparing ?? 0}</span>
           </span>
         </div>
+        )}
 
         {/* Disclaimer */}
         <div className="flex gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-4 py-3">
@@ -408,9 +463,10 @@ export default function CustomerOrder() {
 
             <button
               onClick={handleContinue}
-              className="w-full py-4 bg-primary text-primary-foreground rounded-2xl font-bold text-base flex items-center justify-center gap-2"
+              disabled={storeClosed}
+              className="w-full py-4 bg-primary text-primary-foreground rounded-2xl font-bold text-base flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Browse Menu <ArrowRight size={18} />
+              {storeClosed ? <><Ban size={18} /> Ordering Unavailable</> : <>Browse Menu <ArrowRight size={18} /></>}
             </button>
           </div>
         )}
@@ -485,8 +541,9 @@ export default function CustomerOrder() {
                         <div className="flex items-center gap-2 shrink-0">
                           {qty === 0 ? (
                             <button
-                              onClick={() => addItem(product.id, product.name, product.price)}
-                              className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-bold"
+                              onClick={() => !storeClosed && addItem(product.id, product.name, product.price)}
+                              disabled={storeClosed}
+                              className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               <Plus size={14} /> Add
                             </button>
@@ -638,16 +695,20 @@ export default function CustomerOrder() {
 
             <button
               onClick={handlePlaceOrder}
-              disabled={cart.length === 0 || createOrder.isPending}
-              className="w-full py-4 bg-primary text-primary-foreground rounded-2xl font-bold text-base flex items-center justify-center gap-2 disabled:opacity-50"
+              disabled={cart.length === 0 || createOrder.isPending || storeClosed}
+              className="w-full py-4 bg-primary text-primary-foreground rounded-2xl font-bold text-base flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {createOrder.isPending
                 ? <><RefreshCw size={16} className="animate-spin" /> Placing Order…</>
-                : <><CheckCircle2 size={18} /> Place Order</>}
+                : storeClosed
+                  ? <><Ban size={18} /> Store is Closed</>
+                  : <><CheckCircle2 size={18} /> Place Order</>}
             </button>
 
             {createOrder.isError && (
-              <p className="text-sm text-destructive text-center">Failed to place order. Please try again.</p>
+              <p className="text-sm text-destructive text-center">
+                {(createOrder.error as { message?: string })?.message ?? "Failed to place order. Please try again."}
+              </p>
             )}
           </div>
         )}

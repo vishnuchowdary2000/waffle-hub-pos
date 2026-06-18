@@ -1,0 +1,299 @@
+FEATURE UPDATE: STORE OPEN / STORE CLOSED MODE WITH SCHEDULES & ANNOUNCEMENTS
+
+
+
+Add a Store Status control.
+
+
+
+ADMIN and COUNTER should be able to switch:
+
+
+
+* Store Open
+
+* Store Closed
+
+
+
+---
+
+
+
+STORE OPEN
+
+
+
+When Store Open:
+
+
+
+* Customer QR ordering works normally.
+
+* Customers can place orders.
+
+* Orders are accepted.
+
+
+
+---
+
+
+
+STORE CLOSED
+
+
+
+When Store Closed:
+
+
+
+* Customer can still open the QR page.
+
+* Menu can be viewed.
+
+* Orders cannot be placed.
+
+
+
+Show message:
+
+
+
+"Sorry, we are currently closed. Please visit us during business hours."
+
+
+
+Disable:
+
+
+
+* Add to Cart
+
+* Checkout
+
+* Place Order
+
+
+
+---
+
+
+
+DASHBOARD
+
+
+
+Show current status prominently:
+
+
+
+🟢 Store Open
+
+🔴 Store Closed
+
+
+
+Display current opening hours.
+
+
+
+---
+
+
+
+STORE TIMINGS MANAGEMENT
+
+
+
+Create a Store Timings section in Admin Settings.
+
+
+
+Admin should be able to:
+
+
+
+* Set Opening Time
+
+* Set Closing Time
+
+
+
+Example:
+
+
+
+Open: 10:00 AM
+
+Close: 11:00 PM
+
+
+
+System should automatically open and close ordering based on configured timings.
+
+
+
+---
+
+
+
+
+
+
+
+MANUAL OVERRIDE
+
+
+
+Admin and Counter should always be able to manually set:
+
+
+
+* Store Open
+
+* Store Closed
+
+
+
+Manual override should take priority over automatic schedules.
+
+
+
+---
+
+
+
+STORE ANNOUNCEMENTS
+
+
+
+Create Announcement Management in Admin Settings.
+
+
+
+Admin should be able to:
+
+
+
+* Create Announcement
+
+* Edit Announcement
+
+* Remove Announcement
+
+* Enable/Disable Announcement
+
+
+
+Examples:
+
+
+
+"Today's Special: Buy 2 Waffles Get 1 Free"
+
+
+
+"Due to high demand, preparation time may be longer than usual."
+
+
+
+"Store will open at 5 PM today."
+
+
+
+---
+
+
+
+CUSTOMER QR PAGE
+
+
+
+Display:
+
+
+
+Store Status:
+
+🟢 Currently Accepting Orders
+
+
+
+or
+
+
+
+🔴 Currently Closed
+
+
+
+Display current operating hours.
+
+
+
+Display active announcement prominently at the top of the page.
+
+
+
+---
+
+
+
+ORDER VALIDATION
+
+
+
+Even if someone bypasses the UI and sends a request directly:
+
+
+
+If Store Status = Closed
+
+
+
+* Reject the order
+
+* Do not create the order
+
+* Return a clear error message
+
+
+
+---
+
+
+
+DATA SAFETY
+
+
+
+Store schedules and announcements in the database.
+
+
+
+Changes should remain saved after application restart or deployment.
+
+
+
+---
+
+
+
+GOAL
+
+
+
+Allow complete control of:
+
+
+
+* Store Open/Closed Status
+
+* Daily Timings 
+
+* Store Announcements
+
+
+
+from the Admin panel without requiring code changes.

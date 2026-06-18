@@ -936,6 +936,108 @@ export const GetDashboardResponse = zod.object({
 })
 
 
+/**
+ * @summary Current store open/closed status with hours and active announcements (public)
+ */
+export const GetPublicStoreStatusResponse = zod.object({
+  "isOpen": zod.boolean(),
+  "openTime": zod.string(),
+  "closeTime": zod.string(),
+  "announcements": zod.array(zod.object({
+  "id": zod.number(),
+  "message": zod.string()
+}))
+})
+
+
+/**
+ * @summary Get store settings (timings + override)
+ */
+export const GetStoreSettingsResponse = zod.object({
+  "manualOverride": zod.boolean(),
+  "isOpen": zod.boolean(),
+  "openTime": zod.string(),
+  "closeTime": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Update store settings (timings + override)
+ */
+export const UpdateStoreSettingsBody = zod.object({
+  "manualOverride": zod.boolean().optional(),
+  "isOpen": zod.boolean().optional(),
+  "openTime": zod.string().optional(),
+  "closeTime": zod.string().optional()
+})
+
+export const UpdateStoreSettingsResponse = zod.object({
+  "manualOverride": zod.boolean(),
+  "isOpen": zod.boolean(),
+  "openTime": zod.string(),
+  "closeTime": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary List all store announcements
+ */
+export const ListStoreAnnouncementsResponseItem = zod.object({
+  "id": zod.number(),
+  "message": zod.string(),
+  "enabled": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+export const ListStoreAnnouncementsResponse = zod.array(ListStoreAnnouncementsResponseItem)
+
+
+/**
+ * @summary Create a store announcement
+ */
+
+
+
+export const CreateStoreAnnouncementBody = zod.object({
+  "message": zod.string().min(1),
+  "enabled": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Update a store announcement
+ */
+export const UpdateStoreAnnouncementParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateStoreAnnouncementBody = zod.object({
+  "message": zod.string().min(1),
+  "enabled": zod.boolean().optional()
+})
+
+export const UpdateStoreAnnouncementResponse = zod.object({
+  "id": zod.number(),
+  "message": zod.string(),
+  "enabled": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a store announcement
+ */
+export const DeleteStoreAnnouncementParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
 export const GetDailyReportQueryParams = zod.object({
   "date": zod.coerce.string().optional()
 })

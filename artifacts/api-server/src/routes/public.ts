@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
-import { eq, and, inArray, desc, sql } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
 import { db, ordersTable, orderItemsTable, categoriesTable, productsTable, customersTable } from "@workspace/db";
 import { CreateOrderBody } from "@workspace/api-zod";
+import { getStoreOpenStatus } from "./store";
 
 const router: IRouter = Router();
 
@@ -78,6 +79,13 @@ router.get("/public/stats", async (_req, res): Promise<void> => {
 
 // ── POST /public/orders ───────────────────────────────────────────────────────
 router.post("/public/orders", async (req, res): Promise<void> => {
+  // Guard: reject if store is closed
+  const { isOpen } = await getStoreOpenStatus();
+  if (!isOpen) {
+    res.status(503).json({ error: "Sorry, we are currently closed. Please visit us during business hours." });
+    return;
+  }
+
   const parsed = CreateOrderBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 

@@ -817,6 +817,120 @@ paths:
               schema:
                 $ref: "#/components/schemas/DashboardSummary"
 
+  # ── Store ─────────────────────────────────────────────────────────────────
+  /public/store/status:
+    get:
+      operationId: getPublicStoreStatus
+      tags: [public]
+      summary: Current store open/closed status with hours and active announcements (public)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreStatus"
+
+  /store/settings:
+    get:
+      operationId: getStoreSettings
+      tags: [store]
+      summary: Get store settings (timings + override)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreSettings"
+    put:
+      operationId: updateStoreSettings
+      tags: [store]
+      summary: Update store settings (timings + override)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StoreSettingsInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreSettings"
+
+  /store/announcements:
+    get:
+      operationId: listStoreAnnouncements
+      tags: [store]
+      summary: List all store announcements
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StoreAnnouncement"
+    post:
+      operationId: createStoreAnnouncement
+      tags: [store]
+      summary: Create a store announcement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StoreAnnouncementInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreAnnouncement"
+
+  /store/announcements/{id}:
+    put:
+      operationId: updateStoreAnnouncement
+      tags: [store]
+      summary: Update a store announcement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StoreAnnouncementInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreAnnouncement"
+    delete:
+      operationId: deleteStoreAnnouncement
+      tags: [store]
+      summary: Delete a store announcement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   /reports/daily:
     get:
       operationId: getDailyReport
@@ -1245,6 +1359,58 @@ components:
       properties:
         preparing: { type: integer }
         rushLevel: { type: string }
+
+    # ── Store ──────────────────────────────────────────────────────────────────
+    StoreStatus:
+      type: object
+      required: [isOpen, openTime, closeTime, announcements]
+      properties:
+        isOpen:        { type: boolean }
+        openTime:      { type: string }
+        closeTime:     { type: string }
+        announcements:
+          type: array
+          items:
+            type: object
+            required: [id, message]
+            properties:
+              id:      { type: integer }
+              message: { type: string }
+
+    StoreSettings:
+      type: object
+      required: [manualOverride, isOpen, openTime, closeTime, updatedAt]
+      properties:
+        manualOverride: { type: boolean }
+        isOpen:         { type: boolean }
+        openTime:       { type: string }
+        closeTime:      { type: string }
+        updatedAt:      { type: string }
+
+    StoreSettingsInput:
+      type: object
+      properties:
+        manualOverride: { type: boolean }
+        isOpen:         { type: boolean }
+        openTime:       { type: string }
+        closeTime:      { type: string }
+
+    StoreAnnouncement:
+      type: object
+      required: [id, message, enabled, createdAt, updatedAt]
+      properties:
+        id:        { type: integer }
+        message:   { type: string }
+        enabled:   { type: boolean }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+
+    StoreAnnouncementInput:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string, minLength: 1 }
+        enabled: { type: boolean }
 
     OrderTrackingResult:
       type: object

@@ -1,6 +1,7 @@
 import {
   useGetDashboard, useListOrders, useUpdateOrderStatus, useAddOrderItem, useListProducts,
-  getGetDashboardQueryKey, getListOrdersQueryKey,
+  useGetPublicStoreStatus, useUpdateStoreSettings,
+  getGetDashboardQueryKey, getListOrdersQueryKey, getGetPublicStoreStatusQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatTime, STATUS_LABELS, ORDER_TYPE_LABELS } from "@/lib/utils";
@@ -9,6 +10,7 @@ import { Link } from "wouter";
 import {
   RefreshCw, TrendingUp, ChefHat, Clock, CheckCircle,
   Search, Trash2, X, AlertTriangle, Plus, Minus, Phone, ShoppingBag,
+  ToggleLeft, ToggleRight,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -55,7 +57,19 @@ function PaymentBadge({ payment, totalAmount }: {
 export default function Dashboard() {
   const qc = useQueryClient();
   const { data, isLoading } = useGetDashboard({ query: { refetchInterval: 3000, queryKey: getGetDashboardQueryKey() } });
+  const { data: storeStatus, refetch: refetchStore } = useGetPublicStoreStatus({
+    query: { queryKey: getGetPublicStoreStatusQueryKey(), refetchInterval: 10000 },
+  });
+  const updateSettings = useUpdateStoreSettings();
   const [search, setSearch] = useState("");
+
+  const toggleStore = () => {
+    if (!storeStatus) return;
+    updateSettings.mutate(
+      { data: { manualOverride: true, isOpen: !storeStatus.isOpen } },
+      { onSuccess: () => refetchStore() }
+    );
+  };
   const [confirm, setConfirm] = useState<ConfirmState>(null);
   const [addItems, setAddItems] = useState<AddItemsState>(null);
 
@@ -96,6 +110,40 @@ export default function Dashboard() {
           <RefreshCw size={16} />
         </button>
       </div>
+
+      {/* Store Status Banner */}
+      {storeStatus && (
+        <div className={cn(
+          "flex items-center gap-3 rounded-xl border px-4 py-3",
+          storeStatus.isOpen
+            ? "bg-green-500/8 border-green-500/25"
+            : "bg-red-500/8 border-red-500/25"
+        )}>
+          <span className={cn("w-3 h-3 rounded-full shrink-0", storeStatus.isOpen ? "bg-green-400" : "bg-red-400")} />
+          <div className="flex-1 min-w-0">
+            <p className={cn("text-sm font-bold", storeStatus.isOpen ? "text-green-400" : "text-red-400")}>
+              {storeStatus.isOpen ? "🟢 Store Open" : "🔴 Store Closed"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Hours: {storeStatus.openTime} – {storeStatus.closeTime}
+            </p>
+          </div>
+          <button
+            onClick={toggleStore}
+            disabled={updateSettings.isPending}
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors",
+              storeStatus.isOpen
+                ? "bg-red-500/15 text-red-400 border-red-500/30 hover:bg-red-500/25"
+                : "bg-green-500/15 text-green-400 border-green-500/30 hover:bg-green-500/25"
+            )}
+          >
+            {storeStatus.isOpen
+              ? <><ToggleRight size={15} /> Close Store</>
+              : <><ToggleLeft size={15} /> Open Store</>}
+          </button>
+        </div>
+      )}
 
       {/* Stat cards — 2 rows */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
