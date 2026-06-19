@@ -72,6 +72,12 @@ export default function MenuManager() {
     });
   };
 
+  const toggleCategory = (id: number, active: boolean) => {
+    updateCategory.mutate({ id, data: { active: !active } }, {
+      onSuccess: () => qc.invalidateQueries({ queryKey: getListCategoriesQueryKey() }),
+    });
+  };
+
   const handleDeleteProduct = (id: number) => {
     deleteProduct.mutate({ id }, {
       onSuccess: () => qc.invalidateQueries({ queryKey: getListProductsQueryKey({}) }),
@@ -269,11 +275,14 @@ export default function MenuManager() {
               <p className="text-center py-8 text-muted-foreground text-sm">No categories yet</p>
             )}
             {categories.map(c => (
-              <div key={c.id} className="bg-card border border-card-border rounded-xl px-4 py-3.5 flex items-center gap-4">
+              <div key={c.id} className={cn("bg-card border border-card-border rounded-xl px-4 py-3.5 flex items-center gap-4", !c.active && "opacity-60")}>
                 <div className="flex-1">
                   <p className="font-semibold text-sm text-foreground">{c.name}</p>
                   <p className="text-xs text-muted-foreground">Order: {c.displayOrder} · {c.active ? "Active" : "Inactive"}</p>
                 </div>
+                <button onClick={() => toggleCategory(c.id, c.active)} className="shrink-0 text-muted-foreground hover:text-primary">
+                  {c.active ? <ToggleRight size={22} className="text-primary" /> : <ToggleLeft size={22} />}
+                </button>
                 <button onClick={() => handleDeleteCategory(c.id)} className="text-muted-foreground hover:text-destructive">
                   <Trash2 size={15} />
                 </button>

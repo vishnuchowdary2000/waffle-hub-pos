@@ -85,8 +85,12 @@ export default function Queue() {
   const updateOrder = useUpdateOrder();
   const updateStatus = useUpdateOrderStatus();
 
+  const STATUS_RANK: Record<string, number> = { preparing: 0, approved: 1, pending_payment: 2, ready: 3 };
   const sorted = [...orders].sort((a, b) => {
     if (a.priority !== b.priority) return a.priority ? -1 : 1;
+    const ra = STATUS_RANK[a.status] ?? 99;
+    const rb = STATUS_RANK[b.status] ?? 99;
+    if (ra !== rb) return ra - rb;
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
 

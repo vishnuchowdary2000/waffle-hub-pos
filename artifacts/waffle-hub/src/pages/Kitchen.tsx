@@ -32,9 +32,14 @@ function elapsed(createdAt: string) {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
+const STATUS_RANK: Record<string, number> = { preparing: 0, approved: 1, ready: 2 };
+
 function sortOrders(orders: Order[]) {
   return [...orders].sort((a, b) => {
     if (a.priority !== b.priority) return a.priority ? -1 : 1;
+    const ra = STATUS_RANK[a.status] ?? 99;
+    const rb = STATUS_RANK[b.status] ?? 99;
+    if (ra !== rb) return ra - rb;
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
 }

@@ -111,8 +111,9 @@ export default function Counter() {
 
   const products = allProducts.filter(p => {
     const matchesCat = activeCategory == null || p.categoryId === activeCategory;
+    const catActive = p.categoryId == null || categories.some(c => c.id === p.categoryId && c.active);
     const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
-    return matchesCat && matchesSearch;
+    return matchesCat && catActive && matchesSearch;
   });
 
   // Default item type matches header selection (delivery → takeaway packaging)

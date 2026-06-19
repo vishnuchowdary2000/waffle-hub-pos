@@ -67,7 +67,7 @@ export default function CustomerOrder() {
     query: { queryKey: getGetPublicStatsQueryKey(), refetchInterval: 10000 },
   });
   const { data: storeStatus } = useGetPublicStoreStatus({
-    query: { queryKey: getGetPublicStoreStatusQueryKey(), refetchInterval: 30000 },
+    query: { queryKey: getGetPublicStoreStatusQueryKey(), refetchInterval: 10000 },
   });
   const storeClosed = storeStatus !== undefined && !storeStatus.isOpen;
   const activeAnnouncements = storeStatus?.announcements ?? [];
@@ -182,6 +182,8 @@ export default function CustomerOrder() {
 
   // ── Step navigation ────────────────────────────────────────────────────────
   const handleContinue = () => {
+    // When store is closed, allow viewing the menu without filling in details
+    if (storeClosed) { setStep("menu"); return; }
     let hasError = false;
     if (!name.trim()) { setNameError("Name is required"); hasError = true; }
     else setNameError("");
@@ -463,10 +465,9 @@ export default function CustomerOrder() {
 
             <button
               onClick={handleContinue}
-              disabled={storeClosed}
-              className="w-full py-4 bg-primary text-primary-foreground rounded-2xl font-bold text-base flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full py-4 bg-primary text-primary-foreground rounded-2xl font-bold text-base flex items-center justify-center gap-2"
             >
-              {storeClosed ? <><Ban size={18} /> Ordering Unavailable</> : <>Browse Menu <ArrowRight size={18} /></>}
+              {storeClosed ? <><UtensilsCrossed size={18} /> View Menu</> : <>Browse Menu <ArrowRight size={18} /></>}
             </button>
           </div>
         )}
@@ -554,8 +555,9 @@ export default function CustomerOrder() {
                                 <Minus size={15} className="text-foreground" />
                               </button>
                               <span className="text-lg font-bold text-foreground w-6 text-center tabular-nums">{qty}</span>
-                              <button onClick={() => addItem(product.id, product.name, product.price)}
-                                className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center hover:opacity-90 transition-colors">
+                              <button onClick={() => !storeClosed && addItem(product.id, product.name, product.price)}
+                                disabled={storeClosed}
+                                className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center hover:opacity-90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                                 <Plus size={15} className="text-primary-foreground" />
                               </button>
                             </div>
