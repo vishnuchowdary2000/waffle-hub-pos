@@ -12,6 +12,9 @@ const PgSession = connectPgSimple(session);
 
 const app: Express = express();
 
+// Trust the Replit reverse proxy so cookies work correctly in production.
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,

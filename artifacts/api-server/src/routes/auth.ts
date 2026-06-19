@@ -63,11 +63,18 @@ router.post("/auth/login", async (req, res) => {
   req.session.username = user.username;
   req.session.displayName = user.displayName ?? null;
 
-  res.json({
-    id: user.id,
-    username: user.username,
-    role: user.role,
-    displayName: user.displayName ?? null,
+  req.session.save((err) => {
+    if (err) {
+      logger.error({ err }, "Session save failed during login");
+      res.status(500).json({ error: "Login failed. Please try again." });
+      return;
+    }
+    res.json({
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      displayName: user.displayName ?? null,
+    });
   });
 });
 

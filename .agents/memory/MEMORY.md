@@ -1,0 +1,1 @@
+- [Session persistence setup](session-persistence.md) — connect-pg-simple session table must be created manually; createTableIfMissing silently fails; causes all auth routes to return 403.
