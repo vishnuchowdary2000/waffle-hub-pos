@@ -91,7 +91,8 @@ export default function Queue() {
   });
 
   const invalidate = () => {
-    void qc.invalidateQueries({ queryKey: getListOrdersQueryKey({ status: ACTIVE_STATUSES }) });
+    // Invalidate ALL orders queries (Queue + Kitchen) so every view updates immediately.
+    void qc.invalidateQueries({ queryKey: getListOrdersQueryKey() });
   };
 
   const setBusy = (id: number, busy: boolean) => {
@@ -201,7 +202,7 @@ export default function Queue() {
                 <div
                   key={order.id}
                   className={cn(
-                    "bg-card border rounded-2xl overflow-hidden transition-all",
+                    "relative bg-card border rounded-2xl overflow-hidden transition-all",
                     order.priority
                       ? "border-amber-500/50 shadow-amber-500/10 shadow-lg"
                       : "border-card-border"

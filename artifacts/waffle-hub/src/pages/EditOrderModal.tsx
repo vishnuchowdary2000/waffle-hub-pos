@@ -51,8 +51,6 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
   preparing: { label: "Preparing", color: "text-blue-400" },
 };
 
-const ACTIVE_STATUSES = "pending_payment,approved,preparing,ready";
-
 export default function EditOrderModal({
   order,
   onClose,
@@ -173,9 +171,8 @@ export default function EditOrderModal({
       },
       {
         onSuccess: () => {
-          void qc.invalidateQueries({
-            queryKey: getListOrdersQueryKey({ status: ACTIVE_STATUSES }),
-          });
+          // Invalidate ALL orders queries so both Queue and Kitchen refresh immediately.
+          void qc.invalidateQueries({ queryKey: getListOrdersQueryKey() });
           onClose();
         },
         onError: () => {
