@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import {
   Clock, RefreshCw, ChefHat, ShoppingBag,
-  UtensilsCrossed, Zap, Sparkles,
+  UtensilsCrossed, Zap, Sparkles, Layers,
 } from "lucide-react";
 
 const ACTIVE_STATUSES = "approved,preparing,ready";
@@ -152,7 +152,8 @@ export default function Kitchen() {
 
   // Split by order-level type — each order belongs to exactly ONE column
   const dineIn   = sortOrders(orders.filter(o => o.orderType === "dine_in"));
-  const takeaway = sortOrders(orders.filter(o => o.orderType !== "dine_in"));
+  const takeaway = sortOrders(orders.filter(o => o.orderType === "takeaway" || o.orderType === "delivery"));
+  const mixed    = sortOrders(orders.filter(o => o.orderType === "mixed"));
 
   return (
     <div className="min-h-screen bg-background">
@@ -187,7 +188,7 @@ export default function Kitchen() {
           <p className="text-sm">Waiting for new orders…</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 min-h-[calc(100vh-72px)]">
+        <div className={cn("grid grid-cols-1 min-h-[calc(100vh-72px)]", mixed.length > 0 ? "md:grid-cols-3" : "md:grid-cols-2")}>
 
           {/* ── Dine In ─────────────────────────────────── */}
           <div className="border-r border-border p-4 space-y-3">
@@ -217,8 +218,8 @@ export default function Kitchen() {
             )}
           </div>
 
-          {/* ── Takeaway ────────────────────────────────── */}
-          <div className="p-4 space-y-3">
+          {/* ── Takeaway / Delivery ─────────────────────── */}
+          <div className={cn("p-4 space-y-3", mixed.length > 0 && "border-r border-border")}>
             <div className="flex items-center gap-2 pb-1">
               <ShoppingBag size={15} className="text-blue-400" />
               <h2 className="font-bold text-base text-foreground">Takeaway</h2>
@@ -245,6 +246,28 @@ export default function Kitchen() {
             )}
           </div>
 
+          {/* ── Mixed Orders ─────────────────────────────── */}
+          {mixed.length > 0 && (
+            <div className="p-4 space-y-3">
+              <div className="flex items-center gap-2 pb-1">
+                <Layers size={15} className="text-purple-400" />
+                <h2 className="font-bold text-base text-foreground">Mixed</h2>
+                <span className="ml-auto text-xs font-semibold bg-purple-500/15 text-purple-400 px-2.5 py-0.5 rounded-full border border-purple-500/25">
+                  {mixed.length}
+                </span>
+              </div>
+              {mixed.map(order => (
+                <KitchenCard
+                  key={order.id}
+                  order={order}
+                  highlightedItemIds={highlightedItemIds}
+                  onPrepare={() => changeStatus(order.id, "preparing")}
+                  onReady={() => changeStatus(order.id, "ready")}
+                />
+              ))}
+            </div>
+          )}
+
         </div>
       )}
     </div>
@@ -252,9 +275,15 @@ export default function Kitchen() {
 }
 
 const ORDER_TYPE_LABEL: Record<string, { label: string; icon: React.ReactNode }> = {
-  dine_in:  { label: "Dine In",  icon: <UtensilsCrossed size={11} /> },
-  takeaway: { label: "Takeaway", icon: <ShoppingBag size={11} /> },
-  delivery: { label: "Delivery", icon: <ShoppingBag size={11} /> },
+  dine_in:  { label: "Dine In",      icon: <UtensilsCrossed size={11} /> },
+  takeaway: { label: "Takeaway",     icon: <ShoppingBag size={11} /> },
+  delivery: { label: "Delivery",     icon: <ShoppingBag size={11} /> },
+  mixed:    { label: "Mixed Order",  icon: <span className="flex items-center gap-0.5"><UtensilsCrossed size={10} /><ShoppingBag size={10} /></span> },
+};
+
+const ITEM_TYPE_META: Record<string, { label: string; className: string }> = {
+  dine_in:  { label: "Dine In",  className: "bg-primary/15 text-primary border-primary/25" },
+  takeaway: { label: "Takeaway", className: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
 };
 
 function KitchenCard({
@@ -322,6 +351,7 @@ function KitchenCard({
       <div className="space-y-1 border-t border-border/40 pt-3">
         {visibleItems.map(item => {
           const isNew = highlightedItemIds.has(item.id);
+          const typeMeta = ITEM_TYPE_META[item.itemOrderType] ?? ITEM_TYPE_META.dine_in;
           return (
             <div
               key={item.id}
@@ -340,9 +370,14 @@ function KitchenCard({
                   {item.productName}
                 </span>
               </div>
-              <span className={cn("text-xl font-black shrink-0", isNew ? "text-orange-400" : "text-primary")}>
-                ×{item.quantity}
-              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded border", typeMeta.className)}>
+                  {typeMeta.label}
+                </span>
+                <span className={cn("text-xl font-black w-8 text-right tabular-nums", isNew ? "text-orange-400" : "text-primary")}>
+                  ×{item.quantity}
+                </span>
+              </div>
             </div>
           );
         })}
