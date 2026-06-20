@@ -281,10 +281,37 @@ const ORDER_TYPE_LABEL: Record<string, { label: string; icon: React.ReactNode }>
   mixed:    { label: "Mixed Order",  icon: <span className="flex items-center gap-0.5"><UtensilsCrossed size={10} /><ShoppingBag size={10} /></span> },
 };
 
-const ITEM_TYPE_META: Record<string, { label: string; className: string }> = {
-  dine_in:  { label: "Dine In",  className: "bg-primary/15 text-primary border-primary/25" },
-  takeaway: { label: "Takeaway", className: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
-};
+function ItemRow({
+  item,
+  highlightedItemIds,
+}: {
+  item: Order["items"][number];
+  highlightedItemIds: Set<number>;
+}) {
+  const isNew = highlightedItemIds.has(item.id);
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-2 rounded-lg px-2 py-1 -mx-2 transition-colors",
+        isNew && "bg-orange-500/12 border border-orange-500/25"
+      )}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        {isNew && (
+          <span className="flex items-center gap-0.5 text-[10px] font-black text-orange-400 bg-orange-500/20 px-1.5 py-0.5 rounded shrink-0 uppercase tracking-wide">
+            <Sparkles size={9} /> NEW
+          </span>
+        )}
+        <span className={cn("text-base font-medium text-foreground leading-snug", isNew && "font-bold")}>
+          {item.productName}
+        </span>
+      </div>
+      <span className={cn("text-xl font-black w-8 text-right tabular-nums shrink-0", isNew ? "text-orange-400" : "text-primary")}>
+        ×{item.quantity}
+      </span>
+    </div>
+  );
+}
 
 function KitchenCard({
   order,
@@ -299,12 +326,14 @@ function KitchenCard({
 }) {
   const meta = STATUS_META[order.status] ?? STATUS_META.approved;
   const orderTypeInfo = ORDER_TYPE_LABEL[order.orderType] ?? ORDER_TYPE_LABEL.dine_in;
+  const isMixed = order.orderType === "mixed";
 
-  // Show ALL items for this order — column assignment is by order type, not item type
-  const visibleItems = order.items;
+  const allItems     = order.items;
+  const dineInItems  = isMixed ? allItems.filter(i => i.itemOrderType !== "takeaway") : allItems;
+  const takeawayItems = isMixed ? allItems.filter(i => i.itemOrderType === "takeaway") : [];
 
   // Flag: this card has at least one newly-added item (drives "UPDATED" banner)
-  const hasNewItems = visibleItems.some(i => highlightedItemIds.has(i.id));
+  const hasNewItems = allItems.some(i => highlightedItemIds.has(i.id));
 
   return (
     <div
@@ -347,41 +376,55 @@ function KitchenCard({
         </p>
       </div>
 
-      {/* Items */}
-      <div className="space-y-1 border-t border-border/40 pt-3">
-        {visibleItems.map(item => {
-          const isNew = highlightedItemIds.has(item.id);
-          const typeMeta = ITEM_TYPE_META[item.itemOrderType] ?? ITEM_TYPE_META.dine_in;
-          return (
-            <div
-              key={item.id}
-              className={cn(
-                "flex items-center justify-between gap-2 rounded-lg px-2 py-1 -mx-2 transition-colors",
-                isNew && "bg-orange-500/12 border border-orange-500/25"
-              )}
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                {isNew && (
-                  <span className="flex items-center gap-0.5 text-[10px] font-black text-orange-400 bg-orange-500/20 px-1.5 py-0.5 rounded shrink-0 uppercase tracking-wide">
-                    <Sparkles size={9} /> NEW
-                  </span>
-                )}
-                <span className={cn("text-base font-medium text-foreground leading-snug", isNew && "font-bold")}>
-                  {item.productName}
+      {/* Items — mixed orders get two segregated sections; others get a flat list */}
+      {isMixed ? (
+        <div className="space-y-3 border-t border-border/40 pt-3">
+          {/* ── Dine In section ── */}
+          {dineInItems.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <UtensilsCrossed size={11} className="text-primary" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-primary">
+                  Dine In
+                </span>
+                <span className="ml-auto text-[10px] text-primary/50 font-semibold">
+                  {dineInItems.length} item{dineInItems.length !== 1 ? "s" : ""}
                 </span>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded border", typeMeta.className)}>
-                  {typeMeta.label}
-                </span>
-                <span className={cn("text-xl font-black w-8 text-right tabular-nums", isNew ? "text-orange-400" : "text-primary")}>
-                  ×{item.quantity}
-                </span>
+              <div className="space-y-0.5 pl-2 border-l-2 border-primary/30">
+                {dineInItems.map(item => (
+                  <ItemRow key={item.id} item={item} highlightedItemIds={highlightedItemIds} />
+                ))}
               </div>
             </div>
-          );
-        })}
-      </div>
+          )}
+          {/* ── Takeaway section ── */}
+          {takeawayItems.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <ShoppingBag size={11} className="text-blue-400" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">
+                  Takeaway
+                </span>
+                <span className="ml-auto text-[10px] text-blue-400/50 font-semibold">
+                  {takeawayItems.length} item{takeawayItems.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <div className="space-y-0.5 pl-2 border-l-2 border-blue-500/30">
+                {takeawayItems.map(item => (
+                  <ItemRow key={item.id} item={item} highlightedItemIds={highlightedItemIds} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-1 border-t border-border/40 pt-3">
+          {dineInItems.map(item => (
+            <ItemRow key={item.id} item={item} highlightedItemIds={highlightedItemIds} />
+          ))}
+        </div>
+      )}
 
       {/* Notes */}
       {order.notes && (
