@@ -304,8 +304,14 @@ router.put("/orders/:id/items", async (req, res): Promise<void> => {
     total = parsed.data.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }
 
-  // Update total and notes
-  const updateData: Record<string, unknown> = { totalAmount: String(total) };
+  // Derive order_type from item types so Kitchen badge stays in sync
+  const itemTypes = new Set(
+    parsed.data.items.map(item => item.itemOrderType ?? "dine_in")
+  );
+  const newOrderType = itemTypes.size === 1 ? [...itemTypes][0] : "mixed";
+
+  // Update total, order_type, and notes
+  const updateData: Record<string, unknown> = { totalAmount: String(total), orderType: newOrderType };
   if (parsed.data.notes !== undefined) updateData.notes = parsed.data.notes;
   await db.update(ordersTable).set(updateData).where(eq(ordersTable.id, params.data.id));
 
