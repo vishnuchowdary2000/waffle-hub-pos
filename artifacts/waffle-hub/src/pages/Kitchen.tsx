@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import {
   Clock, RefreshCw, ChefHat, ShoppingBag,
-  UtensilsCrossed, Zap, Sparkles, Layers,
+  UtensilsCrossed, Zap, Sparkles,
 } from "lucide-react";
 
 const ACTIVE_STATUSES = "approved,preparing,ready";
@@ -150,16 +150,8 @@ export default function Kitchen() {
       .map(([id]) => id)
   );
 
-  // Detect mixed by item types — an order is mixed when it has BOTH dine_in AND takeaway items,
-  // regardless of the order-level orderType (Counter always sets "takeaway" even for mixed carts).
-  const hasItemMix = (o: Order) =>
-    o.items.some(i => i.itemOrderType === "dine_in") &&
-    o.items.some(i => i.itemOrderType === "takeaway");
-
-  const mixed    = sortOrders(orders.filter(o => o.orderType === "mixed" || hasItemMix(o)));
-  const mixedIds = new Set(mixed.map(o => o.id));
-  const dineIn   = sortOrders(orders.filter(o => !mixedIds.has(o.id) && o.orderType === "dine_in"));
-  const takeaway = sortOrders(orders.filter(o => !mixedIds.has(o.id) && (o.orderType === "takeaway" || o.orderType === "delivery")));
+  // Single chronological queue — priority → preparing → approved/ready → created time
+  const queue = sortOrders(orders);
 
   return (
     <div className="min-h-screen bg-background">
@@ -194,97 +186,27 @@ export default function Kitchen() {
           <p className="text-sm">Waiting for new orders…</p>
         </div>
       ) : (
-        <div className={cn("grid grid-cols-1 min-h-[calc(100vh-72px)]", mixed.length > 0 ? "md:grid-cols-3" : "md:grid-cols-2")}>
-
-          {/* ── Dine In ─────────────────────────────────── */}
-          <div className="border-r border-border p-4 space-y-3">
-            <div className="flex items-center gap-2 pb-1">
-              <UtensilsCrossed size={15} className="text-primary" />
-              <h2 className="font-bold text-base text-foreground">Dine In</h2>
-              <span className="ml-auto text-xs font-semibold bg-primary/15 text-primary px-2.5 py-0.5 rounded-full border border-primary/25">
-                {dineIn.length}
-              </span>
-            </div>
-
-            {dineIn.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/50">
-                <UtensilsCrossed size={32} className="mb-2" />
-                <p className="text-sm">No dine-in orders</p>
-              </div>
-            ) : (
-              dineIn.map(order => (
-                <KitchenCard
-                  key={order.id}
-                  order={order}
-                  highlightedItemIds={highlightedItemIds}
-                  onPrepare={() => changeStatus(order.id, "preparing")}
-                  onReady={() => changeStatus(order.id, "ready")}
-                />
-              ))
-            )}
-          </div>
-
-          {/* ── Takeaway / Delivery ─────────────────────── */}
-          <div className={cn("p-4 space-y-3", mixed.length > 0 && "border-r border-border")}>
-            <div className="flex items-center gap-2 pb-1">
-              <ShoppingBag size={15} className="text-blue-400" />
-              <h2 className="font-bold text-base text-foreground">Takeaway</h2>
-              <span className="ml-auto text-xs font-semibold bg-blue-500/15 text-blue-400 px-2.5 py-0.5 rounded-full border border-blue-500/25">
-                {takeaway.length}
-              </span>
-            </div>
-
-            {takeaway.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/50">
-                <ShoppingBag size={32} className="mb-2" />
-                <p className="text-sm">No takeaway orders</p>
-              </div>
-            ) : (
-              takeaway.map(order => (
-                <KitchenCard
-                  key={order.id}
-                  order={order}
-                  highlightedItemIds={highlightedItemIds}
-                  onPrepare={() => changeStatus(order.id, "preparing")}
-                  onReady={() => changeStatus(order.id, "ready")}
-                />
-              ))
-            )}
-          </div>
-
-          {/* ── Mixed Orders ─────────────────────────────── */}
-          {mixed.length > 0 && (
-            <div className="p-4 space-y-3">
-              <div className="flex items-center gap-2 pb-1">
-                <Layers size={15} className="text-purple-400" />
-                <h2 className="font-bold text-base text-foreground">Mixed</h2>
-                <span className="ml-auto text-xs font-semibold bg-purple-500/15 text-purple-400 px-2.5 py-0.5 rounded-full border border-purple-500/25">
-                  {mixed.length}
-                </span>
-              </div>
-              {mixed.map(order => (
-                <KitchenCard
-                  key={order.id}
-                  order={order}
-                  highlightedItemIds={highlightedItemIds}
-                  onPrepare={() => changeStatus(order.id, "preparing")}
-                  onReady={() => changeStatus(order.id, "ready")}
-                />
-              ))}
-            </div>
-          )}
-
+        <div className="max-w-2xl mx-auto p-4 space-y-3">
+          {queue.map(order => (
+            <KitchenCard
+              key={order.id}
+              order={order}
+              highlightedItemIds={highlightedItemIds}
+              onPrepare={() => changeStatus(order.id, "preparing")}
+              onReady={() => changeStatus(order.id, "ready")}
+            />
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-const ORDER_TYPE_LABEL: Record<string, { label: string; icon: React.ReactNode }> = {
-  dine_in:  { label: "Dine In",      icon: <UtensilsCrossed size={11} /> },
-  takeaway: { label: "Takeaway",     icon: <ShoppingBag size={11} /> },
-  delivery: { label: "Delivery",     icon: <ShoppingBag size={11} /> },
-  mixed:    { label: "Mixed Order",  icon: <span className="flex items-center gap-0.5"><UtensilsCrossed size={10} /><ShoppingBag size={10} /></span> },
+const ORDER_TYPE_BADGE: Record<string, { label: string; className: string }> = {
+  dine_in:  { label: "🍽️ Dine In",  className: "bg-primary/15 text-primary border-primary/25" },
+  takeaway: { label: "📦 Takeaway", className: "bg-blue-500/15 text-blue-300 border-blue-500/25" },
+  delivery: { label: "📦 Delivery", className: "bg-blue-500/15 text-blue-300 border-blue-500/25" },
+  mixed:    { label: "🍽️📦 Mixed",  className: "bg-purple-500/15 text-purple-300 border-purple-500/25" },
 };
 
 function ItemRow({
@@ -331,12 +253,13 @@ function KitchenCard({
   onReady: () => void;
 }) {
   const meta = STATUS_META[order.status] ?? STATUS_META.approved;
-  const orderTypeInfo = ORDER_TYPE_LABEL[order.orderType] ?? ORDER_TYPE_LABEL.dine_in;
-  // Detect mixed from items — same logic as column routing so they always agree
+  // Detect mixed from items — order.orderType may be "takeaway" even for mixed carts (Counter)
   const isMixed =
     order.orderType === "mixed" ||
     (order.items.some(i => i.itemOrderType === "dine_in") &&
      order.items.some(i => i.itemOrderType === "takeaway"));
+
+  const typeBadge = ORDER_TYPE_BADGE[isMixed ? "mixed" : order.orderType] ?? ORDER_TYPE_BADGE.dine_in;
 
   const allItems      = order.items;
   const dineInItems   = isMixed ? allItems.filter(i => i.itemOrderType !== "takeaway") : allItems;
@@ -364,6 +287,9 @@ function KitchenCard({
         <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full border", meta.badge)}>
           {meta.label}
         </span>
+        <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full border", typeBadge.className)}>
+          {typeBadge.label}
+        </span>
         <span className="font-mono text-xs text-muted-foreground">{order.orderNumber}</span>
         {hasNewItems && (
           <span className="flex items-center gap-1 text-xs font-bold text-orange-400 bg-orange-500/15 border border-orange-500/30 px-2 py-0.5 rounded-full">
@@ -380,9 +306,6 @@ function KitchenCard({
       <div>
         <p className="text-2xl font-black text-foreground leading-tight tracking-tight">
           {order.customerName}
-        </p>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          <span className="flex items-center gap-1">{orderTypeInfo.icon} {orderTypeInfo.label}</span>
         </p>
       </div>
 
