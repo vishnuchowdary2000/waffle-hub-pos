@@ -150,10 +150,16 @@ export default function Kitchen() {
       .map(([id]) => id)
   );
 
-  // Split by order-level type — each order belongs to exactly ONE column
-  const dineIn   = sortOrders(orders.filter(o => o.orderType === "dine_in"));
-  const takeaway = sortOrders(orders.filter(o => o.orderType === "takeaway" || o.orderType === "delivery"));
-  const mixed    = sortOrders(orders.filter(o => o.orderType === "mixed"));
+  // Detect mixed by item types — an order is mixed when it has BOTH dine_in AND takeaway items,
+  // regardless of the order-level orderType (Counter always sets "takeaway" even for mixed carts).
+  const hasItemMix = (o: Order) =>
+    o.items.some(i => i.itemOrderType === "dine_in") &&
+    o.items.some(i => i.itemOrderType === "takeaway");
+
+  const mixed    = sortOrders(orders.filter(o => o.orderType === "mixed" || hasItemMix(o)));
+  const mixedIds = new Set(mixed.map(o => o.id));
+  const dineIn   = sortOrders(orders.filter(o => !mixedIds.has(o.id) && o.orderType === "dine_in"));
+  const takeaway = sortOrders(orders.filter(o => !mixedIds.has(o.id) && (o.orderType === "takeaway" || o.orderType === "delivery")));
 
   return (
     <div className="min-h-screen bg-background">
@@ -326,10 +332,14 @@ function KitchenCard({
 }) {
   const meta = STATUS_META[order.status] ?? STATUS_META.approved;
   const orderTypeInfo = ORDER_TYPE_LABEL[order.orderType] ?? ORDER_TYPE_LABEL.dine_in;
-  const isMixed = order.orderType === "mixed";
+  // Detect mixed from items — same logic as column routing so they always agree
+  const isMixed =
+    order.orderType === "mixed" ||
+    (order.items.some(i => i.itemOrderType === "dine_in") &&
+     order.items.some(i => i.itemOrderType === "takeaway"));
 
-  const allItems     = order.items;
-  const dineInItems  = isMixed ? allItems.filter(i => i.itemOrderType !== "takeaway") : allItems;
+  const allItems      = order.items;
+  const dineInItems   = isMixed ? allItems.filter(i => i.itemOrderType !== "takeaway") : allItems;
   const takeawayItems = isMixed ? allItems.filter(i => i.itemOrderType === "takeaway") : [];
 
   // Flag: this card has at least one newly-added item (drives "UPDATED" banner)
