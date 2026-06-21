@@ -149,19 +149,17 @@ export default function Counter() {
   useEffect(() => {
     const newOnes = qrOrders.filter(o => !seenIdsRef.current.has(o.id));
     if (newOnes.length > 0) {
-      if (initializedRef.current) {
-        setNotifOrders(prev => [
-          ...newOnes.map(o => ({
-            id: o.id,
-            orderNumber: o.orderNumber,
-            customerName: o.customerName,
-            totalAmount: o.totalAmount,
-            items: o.items.map(i => ({ productName: i.productName, quantity: i.quantity })),
-          })),
-          ...prev,
-        ]);
-        if (soundEnabledRef.current) playChime();
-      }
+      setNotifOrders(prev => [
+        ...newOnes.map(o => ({
+          id: o.id,
+          orderNumber: o.orderNumber,
+          customerName: o.customerName,
+          totalAmount: o.totalAmount,
+          items: o.items.map(i => ({ productName: i.productName, quantity: i.quantity })),
+        })),
+        ...prev,
+      ]);
+      if (initializedRef.current && soundEnabledRef.current) playChime();
       newOnes.forEach(o => seenIdsRef.current.add(o.id));
     }
     if (!initializedRef.current) initializedRef.current = true;
@@ -370,10 +368,21 @@ export default function Counter() {
                     </p>
                     <p className="text-xs font-bold text-primary mt-0.5">{formatCurrency(o.totalAmount)}</p>
                   </div>
-                  <button onClick={() => dismissNotif(o.id)}
-                    className="shrink-0 text-muted-foreground hover:text-foreground p-0.5 mt-0.5">
-                    <X size={13} />
-                  </button>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <button
+                      onClick={() => updateStatus.mutate(
+                        { id: o.id, data: { status: "approved" } },
+                        { onSuccess: () => dismissNotif(o.id) }
+                      )}
+                      className="text-xs font-bold bg-amber-500 hover:bg-amber-400 text-black rounded-md px-2 py-0.5 leading-tight"
+                    >
+                      Accept
+                    </button>
+                    <button onClick={() => dismissNotif(o.id)}
+                      className="text-muted-foreground hover:text-foreground p-0.5">
+                      <X size={13} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
