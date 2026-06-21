@@ -1559,9 +1559,10 @@ components:
       type: object
       required: [isOpen, openTime, closeTime, announcements]
       properties:
-        isOpen:        { type: boolean }
-        openTime:      { type: string }
-        closeTime:     { type: string }
+        isOpen:         { type: boolean }
+        openTime:       { type: string }
+        closeTime:      { type: string }
+        contactNumber:  { type: string }
         announcements:
           type: array
           items:
@@ -1575,19 +1576,21 @@ components:
       type: object
       required: [manualOverride, isOpen, openTime, closeTime, updatedAt]
       properties:
-        manualOverride: { type: boolean }
-        isOpen:         { type: boolean }
-        openTime:       { type: string }
-        closeTime:      { type: string }
-        updatedAt:      { type: string }
+        manualOverride:  { type: boolean }
+        isOpen:          { type: boolean }
+        openTime:        { type: string }
+        closeTime:       { type: string }
+        contactNumber:   { type: string }
+        updatedAt:       { type: string }
 
     StoreSettingsInput:
       type: object
       properties:
-        manualOverride: { type: boolean }
-        isOpen:         { type: boolean }
-        openTime:       { type: string }
-        closeTime:      { type: string }
+        manualOverride:  { type: boolean }
+        isOpen:          { type: boolean }
+        openTime:        { type: string }
+        closeTime:       { type: string }
+        contactNumber:   { type: string }
 
     StoreAnnouncement:
       type: object

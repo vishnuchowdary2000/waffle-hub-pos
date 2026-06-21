@@ -11,5 +11,6 @@ export interface StoreStatus {
   isOpen: boolean;
   openTime: string;
   closeTime: string;
+  contactNumber?: string;
   announcements: StoreStatusAnnouncementsItem[];
 }

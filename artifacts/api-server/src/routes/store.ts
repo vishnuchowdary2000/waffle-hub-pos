@@ -43,7 +43,7 @@ export async function getStoreOpenStatus(): Promise<{
 
 // ── GET /public/store/status ─────────────────────────────────────────────────
 router.get("/public/store/status", async (_req, res): Promise<void> => {
-  const { isOpen, openTime, closeTime } = await getStoreOpenStatus();
+  const { isOpen, openTime, closeTime, settings } = await getStoreOpenStatus();
   const announcements = await db.select().from(storeAnnouncementsTable)
     .where(eq(storeAnnouncementsTable.enabled, true))
     .orderBy(storeAnnouncementsTable.createdAt);
@@ -52,6 +52,7 @@ router.get("/public/store/status", async (_req, res): Promise<void> => {
     isOpen,
     openTime,
     closeTime,
+    contactNumber: settings.contactNumber ?? "",
     announcements: announcements.map(a => ({ id: a.id, message: a.message })),
   });
 });
@@ -64,17 +65,19 @@ router.get("/store/settings", requireRole("admin", "counter"), async (_req, res)
     isOpen: settings.isOpen,
     openTime: settings.openTime,
     closeTime: settings.closeTime,
+    contactNumber: settings.contactNumber ?? "",
     updatedAt: settings.updatedAt.toISOString(),
   });
 });
 
 // ── PUT /store/settings ──────────────────────────────────────────────────────
 router.put("/store/settings", requireRole("admin", "counter"), async (req, res): Promise<void> => {
-  const { manualOverride, isOpen, openTime, closeTime } = req.body as {
+  const { manualOverride, isOpen, openTime, closeTime, contactNumber } = req.body as {
     manualOverride?: boolean;
     isOpen?: boolean;
     openTime?: string;
     closeTime?: string;
+    contactNumber?: string;
   };
 
   const updates: Partial<typeof storeSettingsTable.$inferInsert> = {};
@@ -82,6 +85,7 @@ router.put("/store/settings", requireRole("admin", "counter"), async (req, res):
   if (typeof isOpen === "boolean") updates.isOpen = isOpen;
   if (typeof openTime === "string") updates.openTime = openTime;
   if (typeof closeTime === "string") updates.closeTime = closeTime;
+  if (typeof contactNumber === "string") updates.contactNumber = contactNumber;
 
   await db.insert(storeSettingsTable).values({ id: 1, ...updates })
     .onConflictDoUpdate({ target: storeSettingsTable.id, set: updates });
@@ -92,6 +96,7 @@ router.put("/store/settings", requireRole("admin", "counter"), async (req, res):
     isOpen: updated.isOpen,
     openTime: updated.openTime,
     closeTime: updated.closeTime,
+    contactNumber: updated.contactNumber ?? "",
     updatedAt: updated.updatedAt.toISOString(),
   });
 });

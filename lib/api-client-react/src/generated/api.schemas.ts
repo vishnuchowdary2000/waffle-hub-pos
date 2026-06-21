@@ -404,6 +404,7 @@ export interface StoreStatus {
   isOpen: boolean;
   openTime: string;
   closeTime: string;
+  contactNumber?: string;
   announcements: StoreStatusAnnouncementsItem[];
 }
 
@@ -412,6 +413,7 @@ export interface StoreSettings {
   isOpen: boolean;
   openTime: string;
   closeTime: string;
+  contactNumber?: string;
   updatedAt: string;
 }
 
@@ -420,6 +422,7 @@ export interface StoreSettingsInput {
   isOpen?: boolean;
   openTime?: string;
   closeTime?: string;
+  contactNumber?: string;
 }
 
 export interface StoreAnnouncement {

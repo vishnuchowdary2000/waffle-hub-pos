@@ -11,5 +11,6 @@ export interface StoreSettings {
   isOpen: boolean;
   openTime: string;
   closeTime: string;
+  contactNumber?: string;
   updatedAt: string;
 }

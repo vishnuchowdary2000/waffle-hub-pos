@@ -1,9 +1,12 @@
 import { useParams } from "wouter";
-import { useTrackPublicOrder, getTrackPublicOrderQueryKey } from "@workspace/api-client-react";
+import {
+  useTrackPublicOrder, getTrackPublicOrderQueryKey,
+  useGetPublicStoreStatus, getGetPublicStoreStatusQueryKey,
+} from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
 import {
   ChefHat, Clock, CheckCircle2, RefreshCw,
-  UtensilsCrossed, ShoppingBag, Zap, AlertCircle,
+  UtensilsCrossed, ShoppingBag, Zap, AlertCircle, Phone, MapPin,
 } from "lucide-react";
 
 const STATUSES = [
@@ -29,6 +32,11 @@ export default function CustomerTrack() {
     orderNumber,
     { query: { queryKey: getTrackPublicOrderQueryKey(orderNumber), refetchInterval: 5000 } }
   );
+
+  const { data: storeStatus } = useGetPublicStoreStatus({
+    query: { queryKey: getGetPublicStoreStatusQueryKey() },
+  });
+  const contactNumber = storeStatus?.contactNumber ?? "";
 
   const isCancelled = order?.status === "cancelled";
   const currentIdx = order ? statusIndex(order.status) : 0;
@@ -175,13 +183,55 @@ export default function CustomerTrack() {
               ))}
             </div>
 
-            {/* Pay at counter notice */}
+            {/* Prominent payment instructions for pending_payment */}
             {order.status === "pending_payment" && (
-              <div className="flex gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-4 py-3">
-                <AlertCircle size={15} className="text-amber-400 shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-400/90 leading-relaxed">
-                  <strong>Please pay at the counter.</strong> Your order will be prepared after payment approval.
-                </p>
+              <div className="bg-amber-500/10 border-2 border-amber-500/40 rounded-2xl px-5 py-5 space-y-4">
+                {/* Header */}
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+                    <MapPin size={18} className="text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-amber-400 text-base leading-tight">Payment Required</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Your order is waiting for you</p>
+                  </div>
+                </div>
+
+                {/* Instructions */}
+                <div className="space-y-2 text-sm text-foreground/90">
+                  <p className="flex items-start gap-2">
+                    <span className="text-amber-400 font-bold shrink-0">1.</span>
+                    Please visit the counter to complete your payment.
+                  </p>
+                  <p className="flex items-start gap-2">
+                    <span className="text-amber-400 font-bold shrink-0">2.</span>
+                    Your order will be prepared immediately after payment confirmation.
+                  </p>
+                </div>
+
+                {/* Amount highlight */}
+                <div className="bg-amber-500/15 border border-amber-500/30 rounded-xl px-4 py-3 flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">Amount to pay</span>
+                  <span className="text-xl font-black text-amber-400">₹{order.totalAmount}</span>
+                </div>
+
+                {/* Contact number */}
+                {contactNumber && (
+                  <div className="border-t border-amber-500/20 pt-3 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0">
+                      <Phone size={14} className="text-amber-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Need help?</p>
+                      <a
+                        href={`tel:${contactNumber.replace(/\s/g, "")}`}
+                        className="font-bold text-amber-400 text-sm hover:underline"
+                      >
+                        {contactNumber}
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

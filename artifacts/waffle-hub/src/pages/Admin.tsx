@@ -34,7 +34,7 @@ import {
   Plus, RefreshCw, Eraser,
   TrendingUp, TrendingDown, ShieldCheck,
   UserCog, KeyRound, ToggleLeft, ToggleRight, ChefHat, ShoppingBag,
-  Store, Megaphone, Clock, Check, Pencil,
+  Store, Megaphone, Clock, Check, Pencil, Phone,
 } from "lucide-react";
 
 type Tab = "customers" | "expenses" | "reports" | "users" | "store";
@@ -723,10 +723,13 @@ function StoreTab() {
   const [openTime, setOpenTime] = useState("");
   const [closeTime, setCloseTime] = useState("");
   const [timingsSaved, setTimingsSaved] = useState(false);
+  const [contactNumber, setContactNumber] = useState("");
+  const [contactSaved, setContactSaved] = useState(false);
 
   // Sync local time inputs when settings load
   const loadedOpenTime = settings?.openTime ?? "";
   const loadedCloseTime = settings?.closeTime ?? "";
+  const loadedContactNumber = settings?.contactNumber ?? "";
 
   const effectiveOpenTime = openTime || loadedOpenTime;
   const effectiveCloseTime = closeTime || loadedCloseTime;
@@ -755,6 +758,20 @@ function StoreTab() {
     updateSettings.mutate(
       { data: { manualOverride: false } },
       { onSuccess: () => qc.invalidateQueries({ queryKey: getGetStoreSettingsQueryKey() }) }
+    );
+  };
+
+  const saveContactNumber = () => {
+    const val = contactNumber !== "" ? contactNumber : loadedContactNumber;
+    updateSettings.mutate(
+      { data: { contactNumber: val } },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getGetStoreSettingsQueryKey() });
+          setContactSaved(true);
+          setTimeout(() => setContactSaved(false), 2000);
+        },
+      }
     );
   };
 
@@ -921,6 +938,38 @@ function StoreTab() {
           {timingsSaved
             ? <><Check size={14} /> Saved!</>
             : <><Clock size={14} /> Save Timings</>}
+        </button>
+      </div>
+
+      {/* ── Contact Information ──── */}
+      <div className="bg-card border border-card-border rounded-xl p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Phone size={16} className="text-primary" />
+          <h2 className="font-semibold text-foreground">Contact Information</h2>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          This number is shown to customers on the order tracking page when their payment is pending, so they can reach you for help.
+        </p>
+        <div>
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+            Store Contact Number
+          </label>
+          <input
+            type="tel"
+            placeholder="e.g. +91 98765 43210"
+            value={contactNumber !== "" ? contactNumber : loadedContactNumber}
+            onChange={e => setContactNumber(e.target.value)}
+            className="w-full bg-secondary border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+        </div>
+        <button
+          onClick={saveContactNumber}
+          disabled={updateSettings.isPending}
+          className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+        >
+          {contactSaved
+            ? <><Check size={14} /> Saved!</>
+            : <><Phone size={14} /> Save Contact Number</>}
         </button>
       </div>
 

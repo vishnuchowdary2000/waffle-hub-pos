@@ -1209,6 +1209,7 @@ export const GetPublicStoreStatusResponse = zod.object({
   "isOpen": zod.boolean(),
   "openTime": zod.string(),
   "closeTime": zod.string(),
+  "contactNumber": zod.string().optional(),
   "announcements": zod.array(zod.object({
   "id": zod.number(),
   "message": zod.string()
@@ -1224,6 +1225,7 @@ export const GetStoreSettingsResponse = zod.object({
   "isOpen": zod.boolean(),
   "openTime": zod.string(),
   "closeTime": zod.string(),
+  "contactNumber": zod.string().optional(),
   "updatedAt": zod.string()
 })
 
@@ -1235,7 +1237,8 @@ export const UpdateStoreSettingsBody = zod.object({
   "manualOverride": zod.boolean().optional(),
   "isOpen": zod.boolean().optional(),
   "openTime": zod.string().optional(),
-  "closeTime": zod.string().optional()
+  "closeTime": zod.string().optional(),
+  "contactNumber": zod.string().optional()
 })
 
 export const UpdateStoreSettingsResponse = zod.object({
@@ -1243,6 +1246,7 @@ export const UpdateStoreSettingsResponse = zod.object({
   "isOpen": zod.boolean(),
   "openTime": zod.string(),
   "closeTime": zod.string(),
+  "contactNumber": zod.string().optional(),
   "updatedAt": zod.string()
 })
 

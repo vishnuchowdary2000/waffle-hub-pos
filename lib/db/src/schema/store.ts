@@ -8,6 +8,7 @@ export const storeSettingsTable = pgTable("store_settings", {
   isOpen: boolean("is_open").notNull().default(true),
   openTime: text("open_time").notNull().default("10:00"),
   closeTime: text("close_time").notNull().default("23:00"),
+  contactNumber: text("contact_number").notNull().default(""),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 
