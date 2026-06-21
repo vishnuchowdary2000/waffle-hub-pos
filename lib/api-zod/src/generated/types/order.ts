@@ -23,6 +23,10 @@ export interface Order {
   notes?: string | null;
   priority?: boolean;
   totalAmount: number;
+  subtotalAmount?: number;
+  discountAmount?: number;
+  /** @nullable */
+  offerId?: number | null;
   createdAt: string;
   readyTime: string;
   updatedAt?: string;

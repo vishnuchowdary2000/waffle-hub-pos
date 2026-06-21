@@ -2,15 +2,17 @@ import { useState, useRef, useEffect } from "react";
 import {
   useListCategories, useListProducts, useCreateOrder,
   useCreateOrderPayment, useUpdateOrderStatus, useListCustomers, useListOrders,
+  useListOffers,
   getListOrdersQueryKey, getGetDashboardQueryKey, getListCustomersQueryKey,
 } from "@workspace/api-client-react";
+import type { Offer } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatDate, STATUS_LABELS } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import {
   Plus, Minus, Trash2, ShoppingCart, Search,
   Banknote, Smartphone, CreditCard, Heart,
-  CheckCircle, X, ShoppingBag, UtensilsCrossed, UserRound, Clock,
+  CheckCircle, X, ShoppingBag, UtensilsCrossed, UserRound, Clock, Tag,
 } from "lucide-react";
 
 type ItemOrderType = "dine_in" | "takeaway";
@@ -45,6 +47,39 @@ type Customer = {
 const ORDER_TYPES = ["dine_in", "takeaway", "delivery"] as const;
 const ORDER_TYPE_LABELS: Record<string, string> = { dine_in: "Dine In", takeaway: "Takeaway", delivery: "Delivery" };
 
+type OfferParams = {
+  buyQty?: number; getQty?: number;
+  percentage?: number;
+  amount?: number;
+  minBill?: number; discountAmount?: number;
+};
+
+function computeDiscount(offer: Offer, items: CartItem[]): number {
+  const p = offer.params as OfferParams;
+  const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
+  switch (offer.type) {
+    case "percentage":
+      return Math.round(subtotal * (p.percentage ?? 0)) / 100;
+    case "fixed_amount":
+      return Math.min(p.amount ?? 0, subtotal);
+    case "min_bill":
+      return subtotal >= (p.minBill ?? 0) ? (p.discountAmount ?? 0) : 0;
+    case "buy_x_get_y": {
+      const buyQty = p.buyQty ?? 0;
+      const getQty = p.getQty ?? 0;
+      if (buyQty <= 0 || getQty <= 0) return 0;
+      const totalUnits = items.reduce((s, i) => s + i.quantity, 0);
+      const freeUnits = Math.floor(totalUnits / (buyQty + getQty)) * getQty;
+      if (freeUnits <= 0) return 0;
+      const units: number[] = [];
+      for (const item of items) for (let q = 0; q < item.quantity; q++) units.push(item.price);
+      units.sort((a, b) => a - b);
+      return units.slice(0, freeUnits).reduce((s, p) => s + p, 0);
+    }
+    default: return 0;
+  }
+}
+
 export default function Counter() {
   const qc = useQueryClient();
 
@@ -62,9 +97,11 @@ export default function Counter() {
   const [activeCategory, setActiveCategory] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
+  const [selectedOfferId, setSelectedOfferId] = useState<number | null>(null);
 
   const { data: categories = [] } = useListCategories();
   const { data: allProducts = [] } = useListProducts({ active: true });
+  const { data: activeOffers = [] } = useListOffers({ active: true });
   const createOrder = useCreateOrder();
   const createPayment = useCreateOrderPayment();
   const updateStatus = useUpdateOrderStatus();
@@ -156,7 +193,10 @@ export default function Counter() {
   };
 
   const removeItem = (idx: number) => setCart(prev => prev.filter((_, i) => i !== idx));
-  const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const selectedOffer = activeOffers.find(o => o.id === selectedOfferId) ?? null;
+  const offerDiscount = selectedOffer ? Math.min(computeDiscount(selectedOffer, cart), subtotal) : 0;
+  const total = subtotal - offerDiscount;
 
   const resetForm = () => {
     setCart([]);
@@ -166,6 +206,7 @@ export default function Counter() {
     setSelectedCustomer(null);
     setCustomerQuery("");
     setNotes("");
+    setSelectedOfferId(null);
   };
 
   const placeOrder = () => {
@@ -177,6 +218,7 @@ export default function Counter() {
         customerId,
         orderType,
         notes: notes.trim() || undefined,
+        offerId: selectedOfferId ?? undefined,
         items: cart.map(c => ({
           productId: c.productId,
           productName: c.productName,
@@ -185,7 +227,7 @@ export default function Counter() {
           itemOrderType: c.itemOrderType,
         })),
       },
-    }, {
+    } as Parameters<typeof createOrder.mutate>[0], {
       onSuccess: (order) => {
         setPlacedOrder({
           id: order.id,
@@ -421,10 +463,59 @@ export default function Counter() {
         <div className="p-4 border-t border-card-border shrink-0 space-y-3">
           <input type="text" placeholder="Special instructions (optional)" value={notes} onChange={e => setNotes(e.target.value)}
             className="w-full bg-background border border-input rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">{cart.length} item{cart.length !== 1 ? "s" : ""}</span>
-            <span className="text-xl font-bold text-primary">{formatCurrency(total)}</span>
+
+          {/* Offer selector */}
+          {activeOffers.length > 0 && cart.length > 0 && (
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                <Tag size={11} /> Apply Offer
+              </label>
+              <select
+                value={selectedOfferId ?? ""}
+                onChange={e => setSelectedOfferId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full bg-background border border-input rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                <option value="">No offer</option>
+                {activeOffers.map(o => (
+                  <option key={o.id} value={o.id}>{o.name}</option>
+                ))}
+              </select>
+              {selectedOffer && offerDiscount > 0 && (
+                <p className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
+                  ✓ {selectedOffer.name} — saves {formatCurrency(offerDiscount)}
+                </p>
+              )}
+              {selectedOffer && offerDiscount === 0 && (
+                <p className="text-xs text-amber-400 mt-1">Offer conditions not met for current cart</p>
+              )}
+            </div>
+          )}
+
+          {/* Totals */}
+          <div className="space-y-1">
+            {offerDiscount > 0 && (
+              <>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{cart.length} item{cart.length !== 1 ? "s" : ""} · Subtotal</span>
+                  <span className="text-foreground">{formatCurrency(subtotal)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-emerald-400">Offer Discount</span>
+                  <span className="text-emerald-400 font-semibold">−{formatCurrency(offerDiscount)}</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-border/50 pt-1">
+                  <span className="text-sm text-muted-foreground font-medium">Total</span>
+                  <span className="text-xl font-bold text-primary">{formatCurrency(total)}</span>
+                </div>
+              </>
+            )}
+            {offerDiscount === 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">{cart.length} item{cart.length !== 1 ? "s" : ""}</span>
+                <span className="text-xl font-bold text-primary">{formatCurrency(total)}</span>
+              </div>
+            )}
           </div>
+
           {cart.some(i => i.itemOrderType === "takeaway") && (
             <div className="flex items-center gap-1.5 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
               <ShoppingBag size={12} />

@@ -598,6 +598,121 @@ paths:
         "404":
           description: Sub-order not found
 
+  # ── Offers ───────────────────────────────────────────────────────────────────
+  /offers:
+    get:
+      operationId: listOffers
+      tags: [offers]
+      summary: List all offers
+      parameters:
+        - name: active
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Offer"
+    post:
+      operationId: createOffer
+      tags: [offers]
+      summary: Create a new offer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OfferInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Offer"
+
+  /offers/{id}:
+    get:
+      operationId: getOffer
+      tags: [offers]
+      summary: Get a single offer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Offer"
+        "404":
+          description: Not found
+    put:
+      operationId: updateOffer
+      tags: [offers]
+      summary: Update an offer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OfferInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Offer"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteOffer
+      tags: [offers]
+      summary: Delete an offer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /offers/{id}/toggle:
+    patch:
+      operationId: toggleOffer
+      tags: [offers]
+      summary: Toggle offer active status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Offer"
+        "404":
+          description: Not found
+
   # ── Customers ────────────────────────────────────────────────────────────────
   /customers:
     get:
@@ -1077,7 +1192,10 @@ components:
         status:       { type: string }
         notes:        { type: ["string", "null"] }
         priority:     { type: boolean }
-        totalAmount:  { type: number }
+        totalAmount:    { type: number }
+        subtotalAmount: { type: number }
+        discountAmount: { type: number }
+        offerId:        { type: ["integer", "null"] }
         createdAt:    { type: string }
         readyTime:    { type: string }
         updatedAt:    { type: string }
@@ -1104,6 +1222,32 @@ components:
         createdAt: { type: string }
         updatedAt: { type: string }
 
+    # ── Offer ──────────────────────────────────────────────────────────────────
+    Offer:
+      type: object
+      required: [id, name, type, params, active, createdAt]
+      properties:
+        id:        { type: integer }
+        name:      { type: string }
+        type:      { type: string }
+        params:    { type: object, additionalProperties: true }
+        startDate: { type: ["string", "null"] }
+        endDate:   { type: ["string", "null"] }
+        active:    { type: boolean }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+
+    OfferInput:
+      type: object
+      required: [name, type, params]
+      properties:
+        name:      { type: string, minLength: 1 }
+        type:      { type: string }
+        params:    { type: object, additionalProperties: true }
+        startDate: { type: ["string", "null"] }
+        endDate:   { type: ["string", "null"] }
+        active:    { type: boolean }
+
     OrderInput:
       type: object
       required: [customerName, orderType]
@@ -1113,6 +1257,7 @@ components:
         customerId:    { type: ["integer", "null"] }
         orderType:     { type: string }
         notes:         { type: string }
+        offerId:       { type: ["integer", "null"] }
         items:
           type: array
           items:

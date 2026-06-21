@@ -124,12 +124,46 @@ export interface Order {
   notes?: string | null;
   priority?: boolean;
   totalAmount: number;
+  subtotalAmount?: number;
+  discountAmount?: number;
+  /** @nullable */
+  offerId?: number | null;
   createdAt: string;
   readyTime: string;
   updatedAt?: string;
   items: OrderItem[];
   payment?: Payment;
   subOrders?: SubOrder[];
+}
+
+export type OfferParams = { [key: string]: unknown };
+
+export interface Offer {
+  id: number;
+  name: string;
+  type: string;
+  params: OfferParams;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type OfferInputParams = { [key: string]: unknown };
+
+export interface OfferInput {
+  /** @minLength 1 */
+  name: string;
+  type: string;
+  params: OfferInputParams;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+  active?: boolean;
 }
 
 export interface OrderItemInput {
@@ -152,6 +186,8 @@ export interface OrderInput {
   customerId?: number | null;
   orderType: string;
   notes?: string;
+  /** @nullable */
+  offerId?: number | null;
   items?: OrderItemInput[];
 }
 
@@ -428,6 +464,10 @@ status?: string;
 search?: string;
 date?: string;
 customerId?: number;
+};
+
+export type ListOffersParams = {
+active?: boolean;
 };
 
 export type ListCustomersParams = {

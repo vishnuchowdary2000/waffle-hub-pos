@@ -11,6 +11,7 @@ import Customers from "@/pages/Customers";
 import Expenses from "@/pages/Expenses";
 import Reports from "@/pages/Reports";
 import MenuManager from "@/pages/MenuManager";
+import Offers from "@/pages/Offers";
 import Admin from "@/pages/Admin";
 import Login from "@/pages/Login";
 import Queue from "@/pages/Queue";
@@ -137,6 +138,9 @@ function Router() {
               </Route>
               <Route path="/menu">
                 {() => <ProtectedRoute component={MenuManager} roles={["admin"]} />}
+              </Route>
+              <Route path="/offers">
+                {() => <ProtectedRoute component={Offers} roles={["admin"]} />}
               </Route>
               <Route path="/admin">
                 {() => <ProtectedRoute component={Admin} roles={["admin"]} />}

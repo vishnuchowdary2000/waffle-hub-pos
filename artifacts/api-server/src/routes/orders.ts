@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and, or, ilike, gte, lte, sql } from "drizzle-orm";
-import { db, ordersTable, orderItemsTable, paymentsTable, customersTable, subOrdersTable } from "@workspace/db";
+import { db, ordersTable, orderItemsTable, paymentsTable, customersTable, subOrdersTable, offersTable } from "@workspace/db";
+import { computeOfferDiscount } from "./offers";
 import {
   CreateOrderBody,
   GetOrderParams,
@@ -106,7 +107,10 @@ async function getFullOrder(id: number) {
     .orderBy(subOrdersTable.subCode);
   return {
     ...order,
-    totalAmount: Number(order.totalAmount),
+    totalAmount:    Number(order.totalAmount),
+    subtotalAmount: Number(order.subtotalAmount),
+    discountAmount: Number(order.discountAmount),
+    offerId:        order.offerId ?? null,
     readyTime: order.readyTime.toISOString(),
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
@@ -202,7 +206,7 @@ router.post("/orders", async (req, res): Promise<void> => {
   await db.update(ordersTable).set({ orderNumber }).where(eq(ordersTable.id, order.id));
 
   // Insert items
-  let total = 0;
+  let subtotal = 0;
   if (parsed.data.items && parsed.data.items.length > 0) {
     const itemsToInsert = parsed.data.items.map(item => ({
       orderId: order.id,
@@ -214,9 +218,29 @@ router.post("/orders", async (req, res): Promise<void> => {
       notes: item.notes ?? null,
     }));
     await db.insert(orderItemsTable).values(itemsToInsert);
-    total = parsed.data.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    await db.update(ordersTable).set({ totalAmount: String(total) }).where(eq(ordersTable.id, order.id));
+    subtotal = parsed.data.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }
+
+  // Apply offer discount
+  const offerId = (parsed.data as { offerId?: number | null }).offerId ?? null;
+  let discountAmt = 0;
+  if (offerId) {
+    const [offer] = await db.select().from(offersTable).where(eq(offersTable.id, offerId));
+    if (offer && offer.active) {
+      const cartItems = (parsed.data.items ?? []).map(i => ({ price: i.price, quantity: i.quantity }));
+      discountAmt = computeOfferDiscount(offer, cartItems);
+      discountAmt = Math.min(discountAmt, subtotal);
+      discountAmt = Math.round(discountAmt * 100) / 100;
+    }
+  }
+
+  const total = subtotal - discountAmt;
+  await db.update(ordersTable).set({
+    totalAmount:    String(total),
+    subtotalAmount: String(subtotal),
+    discountAmount: String(discountAmt),
+    offerId,
+  }).where(eq(ordersTable.id, order.id));
 
   // Sync sub-orders (creates A/B if mixed)
   await syncSubOrders(order.id, "pending_payment");

@@ -56,6 +56,7 @@ export const CreatePublicOrderBody = zod.object({
   "customerId": zod.number().nullish(),
   "orderType": zod.string(),
   "notes": zod.string().optional(),
+  "offerId": zod.number().nullish(),
   "items": zod.array(zod.object({
   "productId": zod.number().nullish(),
   "productName": zod.string().min(1),
@@ -264,6 +265,9 @@ export const ListOrdersResponseItem = zod.object({
   "notes": zod.string().nullish(),
   "priority": zod.boolean().optional(),
   "totalAmount": zod.number(),
+  "subtotalAmount": zod.number().optional(),
+  "discountAmount": zod.number().optional(),
+  "offerId": zod.number().nullish(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -318,6 +322,7 @@ export const CreateOrderBody = zod.object({
   "customerId": zod.number().nullish(),
   "orderType": zod.string(),
   "notes": zod.string().optional(),
+  "offerId": zod.number().nullish(),
   "items": zod.array(zod.object({
   "productId": zod.number().nullish(),
   "productName": zod.string().min(1),
@@ -344,6 +349,9 @@ export const GetOrderResponse = zod.object({
   "notes": zod.string().nullish(),
   "priority": zod.boolean().optional(),
   "totalAmount": zod.number(),
+  "subtotalAmount": zod.number().optional(),
+  "discountAmount": zod.number().optional(),
+  "offerId": zod.number().nullish(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -409,6 +417,9 @@ export const UpdateOrderResponse = zod.object({
   "notes": zod.string().nullish(),
   "priority": zod.boolean().optional(),
   "totalAmount": zod.number(),
+  "subtotalAmount": zod.number().optional(),
+  "discountAmount": zod.number().optional(),
+  "offerId": zod.number().nullish(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -475,6 +486,9 @@ export const UpdateOrderStatusResponse = zod.object({
   "notes": zod.string().nullish(),
   "priority": zod.boolean().optional(),
   "totalAmount": zod.number(),
+  "subtotalAmount": zod.number().optional(),
+  "discountAmount": zod.number().optional(),
+  "offerId": zod.number().nullish(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -569,6 +583,9 @@ export const ReplaceOrderItemsResponse = zod.object({
   "notes": zod.string().nullish(),
   "priority": zod.boolean().optional(),
   "totalAmount": zod.number(),
+  "subtotalAmount": zod.number().optional(),
+  "discountAmount": zod.number().optional(),
+  "offerId": zod.number().nullish(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -760,6 +777,9 @@ export const UpdateSubOrderStatusResponse = zod.object({
   "notes": zod.string().nullish(),
   "priority": zod.boolean().optional(),
   "totalAmount": zod.number(),
+  "subtotalAmount": zod.number().optional(),
+  "discountAmount": zod.number().optional(),
+  "offerId": zod.number().nullish(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -799,6 +819,123 @@ export const UpdateSubOrderStatusResponse = zod.object({
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
 })).optional()
+})
+
+
+/**
+ * @summary List all offers
+ */
+export const ListOffersQueryParams = zod.object({
+  "active": zod.coerce.boolean().optional()
+})
+
+export const ListOffersResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "type": zod.string(),
+  "params": zod.record(zod.string(), zod.unknown()),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish(),
+  "active": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+export const ListOffersResponse = zod.array(ListOffersResponseItem)
+
+
+/**
+ * @summary Create a new offer
+ */
+
+
+
+export const CreateOfferBody = zod.object({
+  "name": zod.string().min(1),
+  "type": zod.string(),
+  "params": zod.record(zod.string(), zod.unknown()),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish(),
+  "active": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Get a single offer
+ */
+export const GetOfferParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetOfferResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "type": zod.string(),
+  "params": zod.record(zod.string(), zod.unknown()),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish(),
+  "active": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Update an offer
+ */
+export const UpdateOfferParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateOfferBody = zod.object({
+  "name": zod.string().min(1),
+  "type": zod.string(),
+  "params": zod.record(zod.string(), zod.unknown()),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish(),
+  "active": zod.boolean().optional()
+})
+
+export const UpdateOfferResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "type": zod.string(),
+  "params": zod.record(zod.string(), zod.unknown()),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish(),
+  "active": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Delete an offer
+ */
+export const DeleteOfferParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Toggle offer active status
+ */
+export const ToggleOfferParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ToggleOfferResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "type": zod.string(),
+  "params": zod.record(zod.string(), zod.unknown()),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish(),
+  "active": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
 })
 
 
@@ -1011,6 +1148,9 @@ export const GetDashboardResponse = zod.object({
   "notes": zod.string().nullish(),
   "priority": zod.boolean().optional(),
   "totalAmount": zod.number(),
+  "subtotalAmount": zod.number().optional(),
+  "discountAmount": zod.number().optional(),
+  "offerId": zod.number().nullish(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),

@@ -179,6 +179,18 @@ export default function Billing() {
 
         {/* Totals summary box */}
         <div className="mt-4 border-t border-border pt-4 bg-secondary/40 rounded-xl p-4 space-y-2">
+          {(order.discountAmount ?? 0) > 0 && (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="text-foreground">{formatCurrency(order.subtotalAmount ?? 0)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-emerald-400 flex items-center gap-1">Offer Discount</span>
+                <span className="text-emerald-400 font-semibold">−{formatCurrency(order.discountAmount ?? 0)}</span>
+              </div>
+            </>
+          )}
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Total Amount</span>
             <span className="font-bold text-foreground">{formatCurrency(totalAmount)}</span>

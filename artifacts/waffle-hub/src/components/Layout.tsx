@@ -14,6 +14,7 @@ import {
   ClipboardList,
   LogOut,
   Zap,
+  Tag,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth, useRole } from "@/contexts/AuthContext";
@@ -32,6 +33,7 @@ function buildNav(role: string | null): NavItem[] {
         { href: "/expenses", label: "Expenses", icon: Receipt },
         { href: "/reports", label: "Reports", icon: BarChart3 },
         { href: "/menu", label: "Menu", icon: UtensilsCrossed },
+        { href: "/offers", label: "Offers", icon: Tag },
         { href: "/admin", label: "Admin", icon: ShieldCheck },
       ];
     case "counter":
