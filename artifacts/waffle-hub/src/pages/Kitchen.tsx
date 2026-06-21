@@ -47,27 +47,34 @@ type KitchenItem =
   | { kind: "order"; order: Order }
   | { kind: "sub"; order: Order; subOrder: SubOrder };
 
-function buildQueue(orders: Order[]): KitchenItem[] {
-  const items: KitchenItem[] = [];
-  for (const order of orders) {
-    const subs = order.subOrders ?? [];
-    if (subs.length >= 2) {
-      for (const sub of subs) {
-        items.push({ kind: "sub", order, subOrder: sub });
-      }
-    } else {
-      items.push({ kind: "order", order });
-    }
-  }
-  return items.sort((a, b) => {
-    if (a.order.priority !== b.order.priority) return a.order.priority ? -1 : 1;
+function sortColumn(items: KitchenItem[]): KitchenItem[] {
+  return [...items].sort((a, b) => {
     const aStatus = a.kind === "sub" ? a.subOrder.status : a.order.status;
     const bStatus = b.kind === "sub" ? b.subOrder.status : b.order.status;
     const ra = STATUS_RANK[aStatus] ?? 99;
     const rb = STATUS_RANK[bStatus] ?? 99;
     if (ra !== rb) return ra - rb;
+    if (a.order.priority !== b.order.priority) return a.order.priority ? -1 : 1;
     return new Date(a.order.createdAt).getTime() - new Date(b.order.createdAt).getTime();
   });
+}
+
+function buildColumns(orders: Order[]): { dineIn: KitchenItem[]; takeaway: KitchenItem[] } {
+  const dineIn: KitchenItem[] = [];
+  const takeaway: KitchenItem[] = [];
+  for (const order of orders) {
+    const subs = order.subOrders ?? [];
+    if (subs.length >= 2) {
+      for (const sub of subs) {
+        const item: KitchenItem = { kind: "sub", order, subOrder: sub };
+        (sub.orderType === "dine_in" ? dineIn : takeaway).push(item);
+      }
+    } else {
+      const item: KitchenItem = { kind: "order", order };
+      (order.orderType === "dine_in" ? dineIn : takeaway).push(item);
+    }
+  }
+  return { dineIn: sortColumn(dineIn), takeaway: sortColumn(takeaway) };
 }
 
 export default function Kitchen() {
@@ -153,14 +160,35 @@ export default function Kitchen() {
       .map(([id]) => id)
   );
 
-  const queue = buildQueue(orders);
+  const { dineIn, takeaway } = buildColumns(orders);
+  const activeCount = new Set(orders.map(o => o.id)).size;
+  const totalCards = dineIn.length + takeaway.length;
 
-  // For header count: unique parent order IDs in the queue
-  const activeCount = new Set(queue.map(item => item.order.id)).size;
+  const renderCard = (item: KitchenItem) =>
+    item.kind === "sub" ? (
+      <KitchenCard
+        key={`sub-${item.subOrder.id}`}
+        order={item.order}
+        highlightedItemIds={highlightedItemIds}
+        subOrder={item.subOrder}
+        subItems={item.order.items.filter(i => i.itemOrderType === item.subOrder.orderType)}
+        onPrepare={() => changeSubStatus(item.subOrder.id, "preparing")}
+        onReady={() => changeSubStatus(item.subOrder.id, "ready")}
+      />
+    ) : (
+      <KitchenCard
+        key={`order-${item.order.id}`}
+        order={item.order}
+        highlightedItemIds={highlightedItemIds}
+        onPrepare={() => changeStatus(item.order.id, "preparing")}
+        onReady={() => changeStatus(item.order.id, "ready")}
+      />
+    );
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-4 py-3 flex items-center justify-between">
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Top bar */}
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur border-b border-border px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
             <ChefHat size={16} className="text-primary" />
@@ -168,10 +196,9 @@ export default function Kitchen() {
           <div>
             <h1 className="text-lg font-bold text-foreground leading-tight">Kitchen Display</h1>
             <p className="text-xs text-muted-foreground">
-              Active Orders:&nbsp;
-              <span className="font-bold text-foreground">{activeCount}</span>
-              {queue.length > activeCount && (
-                <span className="ml-1 text-primary/70">({queue.length} cards)</span>
+              <span className="font-bold text-foreground">{activeCount}</span> active order{activeCount !== 1 ? "s" : ""}
+              {totalCards > activeCount && (
+                <span className="text-primary/70"> · {totalCards} cards</span>
               )}
             </p>
           </div>
@@ -186,35 +213,62 @@ export default function Kitchen() {
         <div className="flex items-center justify-center py-24">
           <RefreshCw className="animate-spin text-primary" size={28} />
         </div>
-      ) : queue.length === 0 ? (
+      ) : totalCards === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
           <Clock size={48} className="mb-4 opacity-30" />
           <p className="text-lg font-medium">No active orders</p>
           <p className="text-sm">Waiting for new orders…</p>
         </div>
       ) : (
-        <div className="max-w-2xl mx-auto p-4 space-y-3">
-          {queue.map(item =>
-            item.kind === "sub" ? (
-              <KitchenCard
-                key={`sub-${item.subOrder.id}`}
-                order={item.order}
-                highlightedItemIds={highlightedItemIds}
-                subOrder={item.subOrder}
-                subItems={item.order.items.filter(i => i.itemOrderType === item.subOrder.orderType)}
-                onPrepare={() => changeSubStatus(item.subOrder.id, "preparing")}
-                onReady={() => changeSubStatus(item.subOrder.id, "ready")}
-              />
-            ) : (
-              <KitchenCard
-                key={`order-${item.order.id}`}
-                order={item.order}
-                highlightedItemIds={highlightedItemIds}
-                onPrepare={() => changeStatus(item.order.id, "preparing")}
-                onReady={() => changeStatus(item.order.id, "ready")}
-              />
-            )
-          )}
+        /* Two-column layout */
+        <div className="flex flex-1 divide-x divide-border/60">
+
+          {/* ── Dine In column ─────────────────────────────── */}
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Column header */}
+            <div className="sticky top-[57px] z-10 bg-background/95 backdrop-blur px-4 py-2.5 border-b border-primary/20 flex items-center gap-2">
+              <UtensilsCrossed size={13} className="text-primary shrink-0" />
+              <span className="text-xs font-black uppercase tracking-widest text-primary">Dine In</span>
+              <span className="ml-auto text-xs font-semibold text-primary/60 bg-primary/10 px-2 py-0.5 rounded-full">
+                {dineIn.length}
+              </span>
+            </div>
+            {/* Cards */}
+            <div className="p-3 space-y-3 flex-1">
+              {dineIn.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground/40">
+                  <UtensilsCrossed size={32} className="mb-2" />
+                  <p className="text-xs">No dine in orders</p>
+                </div>
+              ) : (
+                dineIn.map(renderCard)
+              )}
+            </div>
+          </div>
+
+          {/* ── Takeaway column ────────────────────────────── */}
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Column header */}
+            <div className="sticky top-[57px] z-10 bg-background/95 backdrop-blur px-4 py-2.5 border-b border-blue-500/20 flex items-center gap-2">
+              <ShoppingBag size={13} className="text-blue-400 shrink-0" />
+              <span className="text-xs font-black uppercase tracking-widest text-blue-400">Takeaway</span>
+              <span className="ml-auto text-xs font-semibold text-blue-400/60 bg-blue-500/10 px-2 py-0.5 rounded-full">
+                {takeaway.length}
+              </span>
+            </div>
+            {/* Cards */}
+            <div className="p-3 space-y-3 flex-1">
+              {takeaway.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground/40">
+                  <ShoppingBag size={32} className="mb-2" />
+                  <p className="text-xs">No takeaway orders</p>
+                </div>
+              ) : (
+                takeaway.map(renderCard)
+              )}
+            </div>
+          </div>
+
         </div>
       )}
     </div>
