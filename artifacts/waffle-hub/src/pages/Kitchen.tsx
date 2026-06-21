@@ -1,5 +1,6 @@
 import {
   useListOrders,
+  useListProducts,
   useUpdateOrderStatus,
   useUpdateSubOrderStatus,
   getListOrdersQueryKey,
@@ -8,10 +9,10 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { playNotificationSound } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Clock, RefreshCw, ChefHat, ShoppingBag,
-  UtensilsCrossed, Zap, Sparkles,
+  UtensilsCrossed, Zap, Sparkles, ClipboardList,
 } from "lucide-react";
 
 const ACTIVE_STATUSES = "approved,preparing,ready";
@@ -89,6 +90,7 @@ export default function Kitchen() {
     { status: ACTIVE_STATUSES },
     { query: { refetchInterval: 3000, queryKey: getListOrdersQueryKey({ status: ACTIVE_STATUSES }) } }
   );
+  const { data: products = [] } = useListProducts({ active: true });
 
   const updateStatus = useUpdateOrderStatus();
   const updateSubStatus = useUpdateSubOrderStatus();
@@ -160,6 +162,53 @@ export default function Kitchen() {
       .map(([id]) => id)
   );
 
+  // productId → categoryName, and UPPER(productName) → categoryName (fallback)
+  const productCategoryMap = useMemo(() => {
+    const byId = new Map<number, string>();
+    const byName = new Map<string, string>(); // UPPER(name) → categoryName
+    for (const p of products) {
+      if (p.id != null && p.categoryName) {
+        byId.set(p.id, p.categoryName);
+        byName.set(p.name.toUpperCase(), p.categoryName);
+      }
+    }
+    return { byId, byName };
+  }, [products]);
+
+  // Pending summary: sum item quantities from approved-only cards, grouped by category
+  const pendingSummary = useMemo(() => {
+    const getCat = (item: { productId?: number | null; productName: string }) => {
+      if (item.productId != null) return productCategoryMap.byId.get(item.productId);
+      return productCategoryMap.byName.get(item.productName.toUpperCase());
+    };
+
+    const counts = new Map<string, number>();
+    for (const order of orders) {
+      const subs = order.subOrders ?? [];
+      if (subs.length >= 2) {
+        // Split order — count per sub-order that is still pending
+        for (const sub of subs) {
+          if (sub.status !== "approved") continue;
+          for (const item of order.items) {
+            if (item.itemOrderType !== sub.orderType) continue;
+            const cat = getCat(item);
+            if (!cat) continue;
+            counts.set(cat, (counts.get(cat) ?? 0) + item.quantity);
+          }
+        }
+      } else {
+        // Regular order — count if still pending
+        if (order.status !== "approved") continue;
+        for (const item of order.items) {
+          const cat = getCat(item);
+          if (!cat) continue;
+          counts.set(cat, (counts.get(cat) ?? 0) + item.quantity);
+        }
+      }
+    }
+    return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [orders, productCategoryMap]);
+
   const { dineIn, takeaway } = buildColumns(orders);
   const activeCount = new Set(orders.map(o => o.id)).size;
   const totalCards = dineIn.length + takeaway.length;
@@ -209,6 +258,30 @@ export default function Kitchen() {
         </div>
       </div>
 
+      {/* ── Production Summary strip ──────────────────────── */}
+      <div className="sticky top-[57px] z-20 bg-background/98 backdrop-blur border-b border-amber-500/25 px-4 py-2 flex items-center gap-3 overflow-x-auto shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
+          <ClipboardList size={13} className="text-amber-400" />
+          <span className="text-xs font-black uppercase tracking-widest text-amber-400">Pending</span>
+        </div>
+        <div className="w-px h-4 bg-border/60 shrink-0" />
+        {pendingSummary.length === 0 ? (
+          <span className="text-xs text-muted-foreground italic">All clear — nothing pending</span>
+        ) : (
+          <div className="flex items-center gap-2">
+            {pendingSummary.map(([cat, qty]) => (
+              <div
+                key={cat}
+                className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/25 rounded-full px-3 py-0.5 shrink-0"
+              >
+                <span className="text-xs font-medium text-amber-200/80">{cat}</span>
+                <span className="text-sm font-black text-amber-400 leading-none">{qty}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {isLoading ? (
         <div className="flex items-center justify-center py-24">
           <RefreshCw className="animate-spin text-primary" size={28} />
@@ -226,7 +299,7 @@ export default function Kitchen() {
           {/* ── Dine In column ─────────────────────────────── */}
           <div className="flex-1 flex flex-col min-w-0">
             {/* Column header */}
-            <div className="sticky top-[57px] z-10 bg-background/95 backdrop-blur px-4 py-2.5 border-b border-primary/20 flex items-center gap-2">
+            <div className="sticky top-[97px] z-10 bg-background/95 backdrop-blur px-4 py-2.5 border-b border-primary/20 flex items-center gap-2">
               <UtensilsCrossed size={13} className="text-primary shrink-0" />
               <span className="text-xs font-black uppercase tracking-widest text-primary">Dine In</span>
               <span className="ml-auto text-xs font-semibold text-primary/60 bg-primary/10 px-2 py-0.5 rounded-full">
@@ -249,7 +322,7 @@ export default function Kitchen() {
           {/* ── Takeaway column ────────────────────────────── */}
           <div className="flex-1 flex flex-col min-w-0">
             {/* Column header */}
-            <div className="sticky top-[57px] z-10 bg-background/95 backdrop-blur px-4 py-2.5 border-b border-blue-500/20 flex items-center gap-2">
+            <div className="sticky top-[97px] z-10 bg-background/95 backdrop-blur px-4 py-2.5 border-b border-blue-500/20 flex items-center gap-2">
               <ShoppingBag size={13} className="text-blue-400 shrink-0" />
               <span className="text-xs font-black uppercase tracking-widest text-blue-400">Takeaway</span>
               <span className="ml-auto text-xs font-semibold text-blue-400/60 bg-blue-500/10 px-2 py-0.5 rounded-full">
