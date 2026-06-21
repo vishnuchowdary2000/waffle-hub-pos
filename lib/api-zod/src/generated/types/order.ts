@@ -7,6 +7,7 @@
  */
 import type { OrderItem } from './orderItem';
 import type { Payment } from './payment';
+import type { SubOrder } from './subOrder';
 
 export interface Order {
   id: number;
@@ -27,4 +28,5 @@ export interface Order {
   updatedAt?: string;
   items: OrderItem[];
   payment?: Payment;
+  subOrders?: SubOrder[];
 }

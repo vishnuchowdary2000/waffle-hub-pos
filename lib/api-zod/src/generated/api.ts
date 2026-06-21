@@ -293,7 +293,16 @@ export const ListOrdersResponseItem = zod.object({
   "balance": zod.number(),
   "status": zod.string(),
   "createdAt": zod.string()
-}).optional()
+}).optional(),
+  "subOrders": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "subCode": zod.string(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})).optional()
 })
 export const ListOrdersResponse = zod.array(ListOrdersResponseItem)
 
@@ -364,7 +373,16 @@ export const GetOrderResponse = zod.object({
   "balance": zod.number(),
   "status": zod.string(),
   "createdAt": zod.string()
-}).optional()
+}).optional(),
+  "subOrders": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "subCode": zod.string(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})).optional()
 })
 
 
@@ -420,7 +438,16 @@ export const UpdateOrderResponse = zod.object({
   "balance": zod.number(),
   "status": zod.string(),
   "createdAt": zod.string()
-}).optional()
+}).optional(),
+  "subOrders": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "subCode": zod.string(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})).optional()
 })
 
 
@@ -477,7 +504,16 @@ export const UpdateOrderStatusResponse = zod.object({
   "balance": zod.number(),
   "status": zod.string(),
   "createdAt": zod.string()
-}).optional()
+}).optional(),
+  "subOrders": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "subCode": zod.string(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})).optional()
 })
 
 
@@ -562,7 +598,16 @@ export const ReplaceOrderItemsResponse = zod.object({
   "balance": zod.number(),
   "status": zod.string(),
   "createdAt": zod.string()
-}).optional()
+}).optional(),
+  "subOrders": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "subCode": zod.string(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})).optional()
 })
 
 
@@ -690,6 +735,70 @@ export const VoidOrderPaymentResponse = zod.object({
   "balance": zod.number(),
   "status": zod.string(),
   "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Update sub-order kitchen status; rolls up to parent order
+ */
+export const UpdateSubOrderStatusParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateSubOrderStatusBody = zod.object({
+  "status": zod.string()
+})
+
+export const UpdateSubOrderStatusResponse = zod.object({
+  "id": zod.number(),
+  "orderNumber": zod.string(),
+  "customerId": zod.number().nullish(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string().nullish(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "notes": zod.string().nullish(),
+  "priority": zod.boolean().optional(),
+  "totalAmount": zod.number(),
+  "createdAt": zod.string(),
+  "readyTime": zod.string(),
+  "updatedAt": zod.string().optional(),
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "productId": zod.number().nullish(),
+  "productName": zod.string(),
+  "price": zod.number(),
+  "quantity": zod.number(),
+  "itemOrderType": zod.string(),
+  "notes": zod.string().nullish()
+})),
+  "payment": zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "totalAmount": zod.number(),
+  "cashAmount": zod.number(),
+  "upiAmount": zod.number(),
+  "cardAmount": zod.number(),
+  "discountType": zod.string().nullable(),
+  "discountValue": zod.number(),
+  "discountAmount": zod.number(),
+  "charityAmount": zod.number(),
+  "finalAmount": zod.number(),
+  "totalPaid": zod.number(),
+  "balance": zod.number(),
+  "status": zod.string(),
+  "createdAt": zod.string()
+}).optional(),
+  "subOrders": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "subCode": zod.string(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})).optional()
 })
 
 
@@ -931,7 +1040,16 @@ export const GetDashboardResponse = zod.object({
   "balance": zod.number(),
   "status": zod.string(),
   "createdAt": zod.string()
-}).optional()
+}).optional(),
+  "subOrders": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "subCode": zod.string(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})).optional()
 })).optional()
 })
 

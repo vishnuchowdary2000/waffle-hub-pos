@@ -100,6 +100,16 @@ export interface Payment {
   createdAt: string;
 }
 
+export interface SubOrder {
+  id: number;
+  orderId: number;
+  subCode: string;
+  orderType: string;
+  status: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface Order {
   id: number;
   orderNumber: string;
@@ -119,6 +129,7 @@ export interface Order {
   updatedAt?: string;
   items: OrderItem[];
   payment?: Payment;
+  subOrders?: SubOrder[];
 }
 
 export interface OrderItemInput {

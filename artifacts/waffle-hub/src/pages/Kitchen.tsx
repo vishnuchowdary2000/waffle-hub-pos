@@ -1,6 +1,7 @@
 import {
   useListOrders,
   useUpdateOrderStatus,
+  useUpdateSubOrderStatus,
   getListOrdersQueryKey,
   type ListOrdersQueryResult,
 } from "@workspace/api-client-react";
@@ -14,14 +15,21 @@ import {
 } from "lucide-react";
 
 const ACTIVE_STATUSES = "approved,preparing,ready";
-const NEW_ITEM_TTL_MS = 45_000; // 45 s highlight window
+const NEW_ITEM_TTL_MS = 45_000;
 
 type Order = ListOrdersQueryResult[number];
+type SubOrder = NonNullable<Order["subOrders"]>[number];
 
 const STATUS_META: Record<string, { label: string; cardBorder: string; badge: string }> = {
   approved:  { label: "New",       cardBorder: "border-violet-500/50 bg-violet-500/5", badge: "bg-violet-500/20 text-violet-300 border-violet-500/30" },
   preparing: { label: "Preparing", cardBorder: "border-blue-500/50 bg-blue-500/5",     badge: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
   ready:     { label: "Ready ✓",   cardBorder: "border-green-500/50 bg-green-500/5",   badge: "bg-green-500/20 text-green-300 border-green-500/30" },
+};
+
+const SUB_CODE_META: Record<string, { bg: string; text: string }> = {
+  A: { bg: "bg-primary/20 border-primary/40",        text: "text-primary" },
+  B: { bg: "bg-blue-500/20 border-blue-500/40",      text: "text-blue-300" },
+  C: { bg: "bg-purple-500/20 border-purple-500/40",  text: "text-purple-300" },
 };
 
 function elapsed(createdAt: string) {
@@ -32,32 +40,42 @@ function elapsed(createdAt: string) {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
+// Sorting: preparing first → approved → ready → by createdAt
 const STATUS_RANK: Record<string, number> = { preparing: 0, approved: 1, ready: 2 };
 
-function sortOrders(orders: Order[]) {
-  return [...orders].sort((a, b) => {
-    if (a.priority !== b.priority) return a.priority ? -1 : 1;
-    const ra = STATUS_RANK[a.status] ?? 99;
-    const rb = STATUS_RANK[b.status] ?? 99;
+type KitchenItem =
+  | { kind: "order"; order: Order }
+  | { kind: "sub"; order: Order; subOrder: SubOrder };
+
+function buildQueue(orders: Order[]): KitchenItem[] {
+  const items: KitchenItem[] = [];
+  for (const order of orders) {
+    const subs = order.subOrders ?? [];
+    if (subs.length >= 2) {
+      for (const sub of subs) {
+        items.push({ kind: "sub", order, subOrder: sub });
+      }
+    } else {
+      items.push({ kind: "order", order });
+    }
+  }
+  return items.sort((a, b) => {
+    if (a.order.priority !== b.order.priority) return a.order.priority ? -1 : 1;
+    const aStatus = a.kind === "sub" ? a.subOrder.status : a.order.status;
+    const bStatus = b.kind === "sub" ? b.subOrder.status : b.order.status;
+    const ra = STATUS_RANK[aStatus] ?? 99;
+    const rb = STATUS_RANK[bStatus] ?? 99;
     if (ra !== rb) return ra - rb;
-    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    return new Date(a.order.createdAt).getTime() - new Date(b.order.createdAt).getTime();
   });
 }
 
 export default function Kitchen() {
   const qc = useQueryClient();
 
-  // ── New-order sound tracking (existing) ─────────────────────────────────
   const prevOrderIds = useRef<Set<number>>(new Set());
-
-  // ── Per-order item snapshot: orderId → Set of known item IDs ────────────
-  // When an order first arrives, all its items are recorded as "baseline" (no highlight).
-  // On subsequent polls, any item ID absent from the snapshot is "new".
   const orderItemSnapshot = useRef<Map<number, Set<number>>>(new Map());
-
-  // ── Highlighted items: itemId → expiry timestamp ─────────────────────────
   const [newItemHighlights, setNewItemHighlights] = useState<Map<number, number>>(new Map());
-
   const [tick, setTick] = useState(0);
 
   const { data: orders = [], isLoading } = useListOrders(
@@ -66,49 +84,35 @@ export default function Kitchen() {
   );
 
   const updateStatus = useUpdateOrderStatus();
+  const updateSubStatus = useUpdateSubOrderStatus();
 
-  // ── Detect new orders AND new items within existing orders ───────────────
+  // Detect new orders and new items within existing orders
   useEffect(() => {
     const now = Date.now();
     const currentOrderIds = new Set(orders.map(o => o.id));
 
-    // Sound for brand-new orders (existing behaviour)
     const hasNewOrder = orders.some(o => !prevOrderIds.current.has(o.id));
     if (prevOrderIds.current.size > 0 && hasNewOrder) {
       playNotificationSound();
     }
     prevOrderIds.current = currentOrderIds;
 
-    // Item diff per order
     const addedItemIds: number[] = [];
-
     for (const order of orders) {
       const knownItems = orderItemSnapshot.current.get(order.id);
       const currentItemIds = new Set(order.items.map(i => i.id));
-
       if (!knownItems) {
-        // Brand-new order — record baseline, no highlighting (whole ticket is new)
         orderItemSnapshot.current.set(order.id, currentItemIds);
       } else {
-        // Existing order — find items that weren't there before
         for (const itemId of currentItemIds) {
-          if (!knownItems.has(itemId)) {
-            addedItemIds.push(itemId);
-          }
+          if (!knownItems.has(itemId)) addedItemIds.push(itemId);
         }
-        // Update snapshot to include new items
         orderItemSnapshot.current.set(order.id, currentItemIds);
       }
     }
-
-    // Clean up snapshots for orders that left the active list
     for (const orderId of orderItemSnapshot.current.keys()) {
-      if (!currentOrderIds.has(orderId)) {
-        orderItemSnapshot.current.delete(orderId);
-      }
+      if (!currentOrderIds.has(orderId)) orderItemSnapshot.current.delete(orderId);
     }
-
-    // Apply highlights for newly-added items
     if (addedItemIds.length > 0) {
       playNotificationSound();
       setNewItemHighlights(prev => {
@@ -120,42 +124,42 @@ export default function Kitchen() {
     }
   }, [orders]);
 
-  // ── Expire stale highlights every 5 s ───────────────────────────────────
   useEffect(() => {
     const t = setInterval(() => {
       setNewItemHighlights(prev => {
         const now = Date.now();
-        if ([...prev.values()].every(exp => exp > now)) return prev; // nothing to remove
-        const next = new Map([...prev].filter(([, exp]) => exp > now));
-        return next;
+        if ([...prev.values()].every(exp => exp > now)) return prev;
+        return new Map([...prev].filter(([, exp]) => exp > now));
       });
-      setTick(x => x + 1); // keep elapsed timers updating
+      setTick(x => x + 1);
     }, 5000);
     return () => clearInterval(t);
   }, []);
 
   void tick;
 
-  const changeStatus = (id: number, status: string) => {
-    updateStatus.mutate(
-      { id, data: { status } },
-      { onSuccess: () => qc.invalidateQueries({ queryKey: getListOrdersQueryKey({ status: ACTIVE_STATUSES }) }) }
-    );
-  };
+  const invalidate = () =>
+    qc.invalidateQueries({ queryKey: getListOrdersQueryKey({ status: ACTIVE_STATUSES }) });
 
-  // Build a flat Set of currently-highlighted item IDs for quick lookup
+  const changeStatus = (id: number, status: string) =>
+    updateStatus.mutate({ id, data: { status } }, { onSuccess: invalidate });
+
+  const changeSubStatus = (subId: number, status: string) =>
+    updateSubStatus.mutate({ id: subId, data: { status } }, { onSuccess: invalidate });
+
   const highlightedItemIds = new Set<number>(
     [...newItemHighlights.entries()]
       .filter(([, exp]) => exp > Date.now())
       .map(([id]) => id)
   );
 
-  // Single chronological queue — priority → preparing → approved/ready → created time
-  const queue = sortOrders(orders);
+  const queue = buildQueue(orders);
+
+  // For header count: unique parent order IDs in the queue
+  const activeCount = new Set(queue.map(item => item.order.id)).size;
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
@@ -165,7 +169,10 @@ export default function Kitchen() {
             <h1 className="text-lg font-bold text-foreground leading-tight">Kitchen Display</h1>
             <p className="text-xs text-muted-foreground">
               Active Orders:&nbsp;
-              <span className="font-bold text-foreground">{orders.length}</span>
+              <span className="font-bold text-foreground">{activeCount}</span>
+              {queue.length > activeCount && (
+                <span className="ml-1 text-primary/70">({queue.length} cards)</span>
+              )}
             </p>
           </div>
         </div>
@@ -179,7 +186,7 @@ export default function Kitchen() {
         <div className="flex items-center justify-center py-24">
           <RefreshCw className="animate-spin text-primary" size={28} />
         </div>
-      ) : orders.length === 0 ? (
+      ) : queue.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
           <Clock size={48} className="mb-4 opacity-30" />
           <p className="text-lg font-medium">No active orders</p>
@@ -187,15 +194,27 @@ export default function Kitchen() {
         </div>
       ) : (
         <div className="max-w-2xl mx-auto p-4 space-y-3">
-          {queue.map(order => (
-            <KitchenCard
-              key={order.id}
-              order={order}
-              highlightedItemIds={highlightedItemIds}
-              onPrepare={() => changeStatus(order.id, "preparing")}
-              onReady={() => changeStatus(order.id, "ready")}
-            />
-          ))}
+          {queue.map(item =>
+            item.kind === "sub" ? (
+              <KitchenCard
+                key={`sub-${item.subOrder.id}`}
+                order={item.order}
+                highlightedItemIds={highlightedItemIds}
+                subOrder={item.subOrder}
+                subItems={item.order.items.filter(i => i.itemOrderType === item.subOrder.orderType)}
+                onPrepare={() => changeSubStatus(item.subOrder.id, "preparing")}
+                onReady={() => changeSubStatus(item.subOrder.id, "ready")}
+              />
+            ) : (
+              <KitchenCard
+                key={`order-${item.order.id}`}
+                order={item.order}
+                highlightedItemIds={highlightedItemIds}
+                onPrepare={() => changeStatus(item.order.id, "preparing")}
+                onReady={() => changeStatus(item.order.id, "ready")}
+              />
+            )
+          )}
         </div>
       )}
     </div>
@@ -205,7 +224,7 @@ export default function Kitchen() {
 const ORDER_TYPE_BADGE: Record<string, { label: string; className: string }> = {
   dine_in:  { label: "🍽️ Dine In",  className: "bg-primary/15 text-primary border-primary/25" },
   takeaway: { label: "📦 Takeaway", className: "bg-blue-500/15 text-blue-300 border-blue-500/25" },
-  delivery: { label: "📦 Delivery", className: "bg-blue-500/15 text-blue-300 border-blue-500/25" },
+  delivery: { label: "🛵 Delivery", className: "bg-blue-500/15 text-blue-300 border-blue-500/25" },
   mixed:    { label: "🍽️📦 Mixed",  className: "bg-purple-500/15 text-purple-300 border-purple-500/25" },
 };
 
@@ -246,27 +265,43 @@ function KitchenCard({
   highlightedItemIds,
   onPrepare,
   onReady,
+  subOrder,
+  subItems,
 }: {
   order: Order;
   highlightedItemIds: Set<number>;
   onPrepare: () => void;
   onReady: () => void;
+  subOrder?: SubOrder;
+  subItems?: Order["items"];
 }) {
-  const meta = STATUS_META[order.status] ?? STATUS_META.approved;
-  // Detect mixed from items — order.orderType may be "takeaway" even for mixed carts (Counter)
+  // Sub-order mode: use subOrder's status/type; regular mode: use order's
+  const isSubMode = !!subOrder;
+  const displayStatus = isSubMode ? subOrder!.status : order.status;
+  const displayType   = isSubMode ? subOrder!.orderType : order.orderType;
+  const displayItems  = isSubMode ? (subItems ?? []) : order.items;
+  const displayNumber = isSubMode
+    ? `${order.orderNumber}${subOrder!.subCode}`
+    : order.orderNumber;
+
+  const meta = STATUS_META[displayStatus] ?? STATUS_META.approved;
+
+  // In sub-order mode, items are pre-filtered — never show mixed layout
   const isMixed =
-    order.orderType === "mixed" ||
-    (order.items.some(i => i.itemOrderType === "dine_in") &&
-     order.items.some(i => i.itemOrderType === "takeaway"));
+    !isSubMode && (
+      order.orderType === "mixed" ||
+      (order.items.some(i => i.itemOrderType === "dine_in") &&
+       order.items.some(i => i.itemOrderType === "takeaway"))
+    );
 
-  const typeBadge = ORDER_TYPE_BADGE[isMixed ? "mixed" : order.orderType] ?? ORDER_TYPE_BADGE.dine_in;
+  const typeBadge = ORDER_TYPE_BADGE[isMixed ? "mixed" : displayType] ?? ORDER_TYPE_BADGE.dine_in;
+  const subCodeMeta = subOrder ? (SUB_CODE_META[subOrder.subCode] ?? SUB_CODE_META.A) : null;
 
-  const allItems      = order.items;
-  const dineInItems   = isMixed ? allItems.filter(i => i.itemOrderType !== "takeaway") : allItems;
+  const allItems   = order.items;
+  const dineInItems   = isMixed ? allItems.filter(i => i.itemOrderType !== "takeaway") : [];
   const takeawayItems = isMixed ? allItems.filter(i => i.itemOrderType === "takeaway") : [];
 
-  // Flag: this card has at least one newly-added item (drives "UPDATED" banner)
-  const hasNewItems = allItems.some(i => highlightedItemIds.has(i.id));
+  const hasNewItems = displayItems.some(i => highlightedItemIds.has(i.id));
 
   return (
     <div
@@ -274,10 +309,11 @@ function KitchenCard({
         "border rounded-2xl p-4 space-y-3 transition-all",
         meta.cardBorder,
         order.priority && "ring-2 ring-amber-500/40",
-        hasNewItems && "ring-2 ring-orange-400/60 animate-pulse-once"
+        hasNewItems && "ring-2 ring-orange-400/60",
+        isSubMode && "border-l-4"
       )}
     >
-      {/* Top row: badges + order number + elapsed */}
+      {/* Top row */}
       <div className="flex items-center gap-2 flex-wrap">
         {order.priority && (
           <span className="flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-full">
@@ -290,7 +326,16 @@ function KitchenCard({
         <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full border", typeBadge.className)}>
           {typeBadge.label}
         </span>
-        <span className="font-mono text-xs text-muted-foreground">{order.orderNumber}</span>
+        {/* Sub-order letter badge */}
+        {subCodeMeta && (
+          <span className={cn(
+            "text-xs font-black px-2 py-0.5 rounded-full border",
+            subCodeMeta.bg, subCodeMeta.text
+          )}>
+            Part {subOrder!.subCode}
+          </span>
+        )}
+        <span className="font-mono text-xs text-muted-foreground">{displayNumber}</span>
         {hasNewItems && (
           <span className="flex items-center gap-1 text-xs font-bold text-orange-400 bg-orange-500/15 border border-orange-500/30 px-2 py-0.5 rounded-full">
             <Sparkles size={11} /> UPDATED
@@ -309,17 +354,22 @@ function KitchenCard({
         </p>
       </div>
 
-      {/* Items — mixed orders get two segregated sections; others get a flat list */}
-      {isMixed ? (
+      {/* Items */}
+      {isSubMode ? (
+        // Sub-order mode: flat filtered list
+        <div className="space-y-1 border-t border-border/40 pt-3">
+          {displayItems.map(item => (
+            <ItemRow key={item.id} item={item} highlightedItemIds={highlightedItemIds} />
+          ))}
+        </div>
+      ) : isMixed ? (
+        // Legacy mixed mode (order has no sub-orders yet — e.g. pending_payment)
         <div className="space-y-3 border-t border-border/40 pt-3">
-          {/* ── Dine In section ── */}
           {dineInItems.length > 0 && (
             <div>
               <div className="flex items-center gap-1.5 mb-1.5">
                 <UtensilsCrossed size={11} className="text-primary" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-primary">
-                  Dine In
-                </span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-primary">Dine In</span>
                 <span className="ml-auto text-[10px] text-primary/50 font-semibold">
                   {dineInItems.length} item{dineInItems.length !== 1 ? "s" : ""}
                 </span>
@@ -331,14 +381,11 @@ function KitchenCard({
               </div>
             </div>
           )}
-          {/* ── Takeaway section ── */}
           {takeawayItems.length > 0 && (
             <div>
               <div className="flex items-center gap-1.5 mb-1.5">
                 <ShoppingBag size={11} className="text-blue-400" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">
-                  Takeaway
-                </span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">Takeaway</span>
                 <span className="ml-auto text-[10px] text-blue-400/50 font-semibold">
                   {takeawayItems.length} item{takeawayItems.length !== 1 ? "s" : ""}
                 </span>
@@ -352,8 +399,9 @@ function KitchenCard({
           )}
         </div>
       ) : (
+        // Regular order: flat list
         <div className="space-y-1 border-t border-border/40 pt-3">
-          {dineInItems.map(item => (
+          {displayItems.map(item => (
             <ItemRow key={item.id} item={item} highlightedItemIds={highlightedItemIds} />
           ))}
         </div>
@@ -368,7 +416,7 @@ function KitchenCard({
 
       {/* Action buttons */}
       <div className="pt-1">
-        {order.status === "approved" && (
+        {displayStatus === "approved" && (
           <button
             onClick={onPrepare}
             className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold transition-colors"
@@ -376,7 +424,7 @@ function KitchenCard({
             Start Preparing
           </button>
         )}
-        {order.status === "preparing" && (
+        {displayStatus === "preparing" && (
           <button
             onClick={onReady}
             className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl text-sm font-bold transition-colors"
@@ -384,7 +432,7 @@ function KitchenCard({
             Mark Ready
           </button>
         )}
-        {order.status === "ready" && (
+        {displayStatus === "ready" && (
           <div className="w-full py-3 bg-green-500/10 border border-green-500/30 rounded-xl text-sm font-bold text-green-400 text-center">
             ✓ Ready — awaiting handover
           </div>

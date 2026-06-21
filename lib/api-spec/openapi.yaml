@@ -570,6 +570,34 @@ paths:
         "404":
           description: Payment not found
 
+  # ── Sub-orders ───────────────────────────────────────────────────────────────
+  /sub-orders/{id}/status:
+    patch:
+      operationId: updateSubOrderStatus
+      tags: [orders]
+      summary: Update sub-order kitchen status; rolls up to parent order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderStatusUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "404":
+          description: Sub-order not found
+
   # ── Customers ────────────────────────────────────────────────────────────────
   /customers:
     get:
@@ -1059,6 +1087,22 @@ components:
             $ref: "#/components/schemas/OrderItem"
         payment:
           $ref: "#/components/schemas/Payment"
+        subOrders:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubOrder"
+
+    SubOrder:
+      type: object
+      required: [id, orderId, subCode, orderType, status, createdAt]
+      properties:
+        id:        { type: integer }
+        orderId:   { type: integer }
+        subCode:   { type: string }
+        orderType: { type: string }
+        status:    { type: string }
+        createdAt: { type: string }
+        updatedAt: { type: string }
 
     OrderInput:
       type: object

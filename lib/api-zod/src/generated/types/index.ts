@@ -52,6 +52,7 @@ export * from './storeSettings';
 export * from './storeSettingsInput';
 export * from './storeStatus';
 export * from './storeStatusAnnouncementsItem';
+export * from './subOrder';
 export * from './user';
 export * from './userInput';
 export * from './userUpdate';

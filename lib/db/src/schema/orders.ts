@@ -55,3 +55,18 @@ export const paymentsTable = pgTable("payments", {
 export const insertPaymentSchema = createInsertSchema(paymentsTable).omit({ id: true, createdAt: true });
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Payment = typeof paymentsTable.$inferSelect;
+
+// Sub-orders: one per order-type group within a mixed order (0044A=dine_in, 0044B=takeaway)
+export const subOrdersTable = pgTable("sub_orders", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").notNull(),
+  subCode: text("sub_code").notNull(),     // 'A' | 'B' | 'C'
+  orderType: text("order_type").notNull(), // 'dine_in' | 'takeaway' | 'delivery'
+  status: text("status").notNull().default("approved"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+export const insertSubOrderSchema = createInsertSchema(subOrdersTable).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertSubOrder = z.infer<typeof insertSubOrderSchema>;
+export type SubOrderRow = typeof subOrdersTable.$inferSelect;

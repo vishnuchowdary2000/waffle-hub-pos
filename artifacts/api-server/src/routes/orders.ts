@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, or, ilike, gte, lte, sql } from "drizzle-orm";
-import { db, ordersTable, orderItemsTable, paymentsTable, customersTable } from "@workspace/db";
+import { db, ordersTable, orderItemsTable, paymentsTable, customersTable, subOrdersTable } from "@workspace/db";
 import {
   CreateOrderBody,
   GetOrderParams,
@@ -21,9 +21,46 @@ import {
   UpdateOrderPaymentBody,
   ListOrdersQueryParams,
   ReplaceOrderItemsBody,
+  UpdateSubOrderStatusParams,
+  UpdateSubOrderStatusBody,
 } from "@workspace/api-zod";
 
 const EDITABLE_STATUSES = ["pending_payment", "approved", "preparing"];
+const SUB_CODE_MAP: Record<string, string> = { dine_in: "A", takeaway: "B", delivery: "C" };
+const KITCHEN_RANK: Record<string, number> = { approved: 0, preparing: 1, ready: 2 };
+
+// Sync sub-orders to match current item types. Preserves existing sub-order statuses.
+async function syncSubOrders(orderId: number, parentStatus: string) {
+  const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId));
+  const typeSet = new Set(items.map(i => i.itemOrderType));
+  const types = [...typeSet].sort();
+  const existing = await db.select().from(subOrdersTable).where(eq(subOrdersTable.orderId, orderId));
+  const existingByType = new Map(existing.map(s => [s.orderType, s]));
+
+  if (types.length <= 1) {
+    if (existing.length > 0) {
+      await db.delete(subOrdersTable).where(eq(subOrdersTable.orderId, orderId));
+    }
+    return;
+  }
+  // Delete sub-orders for types no longer present
+  for (const [type, sub] of existingByType) {
+    if (!typeSet.has(type)) {
+      await db.delete(subOrdersTable).where(eq(subOrdersTable.id, sub.id));
+    }
+  }
+  // Create sub-orders for new types (existing ones keep their status)
+  for (const type of types) {
+    if (!existingByType.has(type)) {
+      await db.insert(subOrdersTable).values({
+        orderId,
+        subCode: SUB_CODE_MAP[type] ?? "X",
+        orderType: type,
+        status: parentStatus,
+      });
+    }
+  }
+}
 
 function serializePayment(p: typeof paymentsTable.$inferSelect) {
   const totalAmount    = Number(p.totalAmount);
@@ -64,6 +101,9 @@ async function getFullOrder(id: number) {
   if (!order) return null;
   const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, id));
   const [payment] = await db.select().from(paymentsTable).where(eq(paymentsTable.orderId, id));
+  const subOrders = await db.select().from(subOrdersTable)
+    .where(eq(subOrdersTable.orderId, id))
+    .orderBy(subOrdersTable.subCode);
   return {
     ...order,
     totalAmount: Number(order.totalAmount),
@@ -71,6 +111,11 @@ async function getFullOrder(id: number) {
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
     items: items.map(i => ({ ...i, price: Number(i.price) })),
+    subOrders: subOrders.map(s => ({
+      ...s,
+      createdAt: s.createdAt.toISOString(),
+      updatedAt: s.updatedAt.toISOString(),
+    })),
     payment: payment ? serializePayment(payment) : null,
   };
 }
@@ -173,6 +218,9 @@ router.post("/orders", async (req, res): Promise<void> => {
     await db.update(ordersTable).set({ totalAmount: String(total) }).where(eq(ordersTable.id, order.id));
   }
 
+  // Sync sub-orders (creates A/B if mixed)
+  await syncSubOrders(order.id, "pending_payment");
+
   const full = await getFullOrder(order.id);
   res.status(201).json(full);
 });
@@ -202,6 +250,7 @@ router.patch("/orders/:id", async (req, res): Promise<void> => {
 router.delete("/orders/:id", async (req, res): Promise<void> => {
   const params = DeleteOrderParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+  await db.delete(subOrdersTable).where(eq(subOrdersTable.orderId, params.data.id));
   await db.delete(orderItemsTable).where(eq(orderItemsTable.orderId, params.data.id));
   await db.delete(paymentsTable).where(eq(paymentsTable.orderId, params.data.id));
   await db.delete(ordersTable).where(eq(ordersTable.id, params.data.id));
@@ -216,6 +265,11 @@ router.patch("/orders/:id/status", async (req, res): Promise<void> => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const [row] = await db.update(ordersTable).set({ status: parsed.data.status }).where(eq(ordersTable.id, params.data.id)).returning();
   if (!row) { res.status(404).json({ error: "Order not found" }); return; }
+
+  // Propagate status change to sub-orders (e.g. approved, cancelled, completed)
+  await db.update(subOrdersTable)
+    .set({ status: parsed.data.status })
+    .where(eq(subOrdersTable.orderId, params.data.id));
 
   // Update customer stats on completion
   if (parsed.data.status === "completed" && row.customerId) {
@@ -317,6 +371,10 @@ router.put("/orders/:id/items", async (req, res): Promise<void> => {
 
   // Sync payment total if a payment record exists (keeps pending amount correct)
   await syncPaymentTotal(params.data.id, total);
+
+  // Sync sub-orders to match the new item set (preserves existing sub-order statuses)
+  const [currentOrder] = await db.select().from(ordersTable).where(eq(ordersTable.id, params.data.id));
+  await syncSubOrders(params.data.id, currentOrder?.status ?? "pending_payment");
 
   const full = await getFullOrder(params.data.id);
   res.json(full);
@@ -427,10 +485,11 @@ router.post("/orders/:id/payment", async (req, res): Promise<void> => {
     status,
   }).returning();
 
-  // Auto-approve order if still in pending_payment state
+  // Auto-approve order + sub-orders if still in pending_payment state
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, params.data.id));
   if (order && order.status === "pending_payment") {
     await db.update(ordersTable).set({ status: "approved" }).where(eq(ordersTable.id, params.data.id));
+    await db.update(subOrdersTable).set({ status: "approved" }).where(eq(subOrdersTable.orderId, params.data.id));
   }
 
   res.status(201).json(serializePayment(payment));
@@ -473,13 +532,40 @@ router.patch("/orders/:id/payment", async (req, res): Promise<void> => {
     status,
   }).where(eq(paymentsTable.orderId, params.data.id)).returning();
 
-  // Auto-approve order if still in pending_payment state
+  // Auto-approve order + sub-orders if still in pending_payment state
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, params.data.id));
   if (order && order.status === "pending_payment") {
     await db.update(ordersTable).set({ status: "approved" }).where(eq(ordersTable.id, params.data.id));
+    await db.update(subOrdersTable).set({ status: "approved" }).where(eq(subOrdersTable.orderId, params.data.id));
   }
 
   res.json(serializePayment(payment));
+});
+
+// Update sub-order kitchen status (rolls up to parent)
+router.patch("/sub-orders/:id/status", async (req, res): Promise<void> => {
+  const params = UpdateSubOrderStatusParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+  const parsed = UpdateSubOrderStatusBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+
+  const [subOrder] = await db.update(subOrdersTable)
+    .set({ status: parsed.data.status })
+    .where(eq(subOrdersTable.id, params.data.id))
+    .returning();
+  if (!subOrder) { res.status(404).json({ error: "Sub-order not found" }); return; }
+
+  // Roll up: parent becomes the least-advanced sub-order status
+  const allSubs = await db.select().from(subOrdersTable)
+    .where(eq(subOrdersTable.orderId, subOrder.orderId));
+  const minRank = Math.min(...allSubs.map(s => KITCHEN_RANK[s.status] ?? 0));
+  const parentStatus = (Object.entries(KITCHEN_RANK).find(([, r]) => r === minRank)?.[0]) ?? "approved";
+  await db.update(ordersTable)
+    .set({ status: parentStatus })
+    .where(eq(ordersTable.id, subOrder.orderId));
+
+  const full = await getFullOrder(subOrder.orderId);
+  res.json(full);
 });
 
 export default router;
