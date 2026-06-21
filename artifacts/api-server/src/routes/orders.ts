@@ -111,6 +111,7 @@ async function getFullOrder(id: number) {
     subtotalAmount: Number(order.subtotalAmount),
     discountAmount: Number(order.discountAmount),
     offerId:        order.offerId ?? null,
+    source:         order.source ?? "counter",
     readyTime: order.readyTime.toISOString(),
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
@@ -155,6 +156,9 @@ router.get("/orders", async (req, res): Promise<void> => {
     }
     if (q.data.customerId) {
       conditions.push(eq(ordersTable.customerId, q.data.customerId));
+    }
+    if ((q.data as { source?: string }).source) {
+      conditions.push(eq(ordersTable.source, (q.data as { source?: string }).source!));
     }
   }
 

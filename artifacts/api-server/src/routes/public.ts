@@ -114,6 +114,7 @@ router.post("/public/orders", async (req, res): Promise<void> => {
     status: "pending_payment",
     notes: parsed.data.notes ?? null,
     totalAmount: "0",
+    source: "customer",
     readyTime,
   }).returning();
 

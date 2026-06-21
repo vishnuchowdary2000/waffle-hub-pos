@@ -13,6 +13,7 @@ import {
   Plus, Minus, Trash2, ShoppingCart, Search,
   Banknote, Smartphone, CreditCard, Heart,
   CheckCircle, X, ShoppingBag, UtensilsCrossed, UserRound, Clock, Tag,
+  Bell, BellOff, QrCode,
 } from "lucide-react";
 
 type ItemOrderType = "dine_in" | "takeaway";
@@ -34,6 +35,14 @@ type PlacedOrder = {
   items: { productName: string; quantity: number; price: number; itemOrderType: string }[];
 };
 
+type NotifOrder = {
+  id: number;
+  orderNumber: string;
+  customerName: string;
+  totalAmount: number;
+  items: { productName: string; quantity: number }[];
+};
+
 type Customer = {
   id: number;
   name: string;
@@ -46,6 +55,29 @@ type Customer = {
 
 const ORDER_TYPES = ["dine_in", "takeaway", "delivery"] as const;
 const ORDER_TYPE_LABELS: Record<string, string> = { dine_in: "Dine In", takeaway: "Takeaway", delivery: "Delivery" };
+
+function playChime() {
+  try {
+    const ctx = new AudioContext();
+    const gain = ctx.createGain();
+    gain.connect(ctx.destination);
+    const notes = [880, 1100, 1320];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      osc.connect(gain);
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.15;
+      gain.gain.setValueAtTime(0.25, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      osc.start(t);
+      osc.stop(t + 0.35);
+      if (i === notes.length - 1) osc.onended = () => ctx.close();
+    });
+  } catch {
+    // browser may block AudioContext without user interaction
+  }
+}
 
 type OfferParams = {
   buyQty?: number; getQty?: number;
@@ -98,6 +130,52 @@ export default function Counter() {
   const [search, setSearch] = useState("");
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
   const [selectedOfferId, setSelectedOfferId] = useState<number | null>(null);
+
+  // ── QR Order Notifications ────────────────────────────────────────────────
+  const [notifOrders, setNotifOrders] = useState<NotifOrder[]>([]);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    try { return localStorage.getItem("wh_notif_sound") !== "off"; } catch { return true; }
+  });
+  const seenIdsRef = useRef<Set<number>>(new Set());
+  const initializedRef = useRef(false);
+  const soundEnabledRef = useRef(soundEnabled);
+  soundEnabledRef.current = soundEnabled;
+
+  const { data: qrOrders = [] } = useListOrders(
+    { source: "customer", status: "pending_payment" } as Parameters<typeof useListOrders>[0],
+    { query: { refetchInterval: 3000, queryKey: getListOrdersQueryKey({ source: "customer", status: "pending_payment" }) } }
+  );
+
+  useEffect(() => {
+    const newOnes = qrOrders.filter(o => !seenIdsRef.current.has(o.id));
+    if (newOnes.length > 0) {
+      if (initializedRef.current) {
+        setNotifOrders(prev => [
+          ...newOnes.map(o => ({
+            id: o.id,
+            orderNumber: o.orderNumber,
+            customerName: o.customerName,
+            totalAmount: o.totalAmount,
+            items: o.items.map(i => ({ productName: i.productName, quantity: i.quantity })),
+          })),
+          ...prev,
+        ]);
+        if (soundEnabledRef.current) playChime();
+      }
+      newOnes.forEach(o => seenIdsRef.current.add(o.id));
+    }
+    if (!initializedRef.current) initializedRef.current = true;
+  }, [qrOrders]);
+
+  const toggleSound = () => {
+    setSoundEnabled(prev => {
+      const next = !prev;
+      try { localStorage.setItem("wh_notif_sound", next ? "on" : "off"); } catch {}
+      return next;
+    });
+  };
+
+  const dismissNotif = (id: number) => setNotifOrders(prev => prev.filter(o => o.id !== id));
 
   const { data: categories = [] } = useListCategories();
   const { data: allProducts = [] } = useListProducts({ active: true });
@@ -250,7 +328,57 @@ export default function Counter() {
       {/* Left: Menu */}
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         <div className="px-4 pt-4 pb-2 space-y-3 shrink-0">
-          <h1 className="text-xl font-bold text-foreground">Order Taking</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-bold text-foreground">Order Taking</h1>
+            <div className="flex items-center gap-2">
+              {notifOrders.length > 0 && (
+                <span className="flex items-center gap-1 bg-amber-500/20 border border-amber-500/40 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
+                  <QrCode size={10} /> {notifOrders.length} QR
+                </span>
+              )}
+              <button
+                onClick={toggleSound}
+                title={soundEnabled ? "Sound ON — click to mute" : "Sound OFF — click to enable"}
+                className={cn(
+                  "p-1.5 rounded-lg border transition-colors",
+                  soundEnabled
+                    ? "text-amber-400 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20"
+                    : "text-muted-foreground border-border bg-secondary hover:border-border"
+                )}
+              >
+                {soundEnabled ? <Bell size={14} /> : <BellOff size={14} />}
+              </button>
+            </div>
+          </div>
+
+          {/* QR Order Notification Cards */}
+          {notifOrders.length > 0 && (
+            <div className="space-y-2">
+              {notifOrders.map(o => (
+                <div key={o.id}
+                  className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/40 rounded-xl px-3 py-2.5 shadow-sm shadow-amber-500/10">
+                  <div className="shrink-0 w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center mt-0.5">
+                    <QrCode size={14} className="text-amber-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-amber-400">{o.orderNumber}</span>
+                      <span className="text-xs text-foreground font-medium truncate">{o.customerName}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                      {o.items.map(i => `${i.productName} ×${i.quantity}`).join(", ")}
+                    </p>
+                    <p className="text-xs font-bold text-primary mt-0.5">{formatCurrency(o.totalAmount)}</p>
+                  </div>
+                  <button onClick={() => dismissNotif(o.id)}
+                    className="shrink-0 text-muted-foreground hover:text-foreground p-0.5 mt-0.5">
+                    <X size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input

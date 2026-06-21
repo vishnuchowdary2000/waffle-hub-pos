@@ -290,6 +290,10 @@ paths:
           in: query
           schema:
             type: integer
+        - name: source
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: OK
@@ -1196,6 +1200,7 @@ components:
         subtotalAmount: { type: number }
         discountAmount: { type: number }
         offerId:        { type: ["integer", "null"] }
+        source:         { type: string }
         createdAt:    { type: string }
         readyTime:    { type: string }
         updatedAt:    { type: string }

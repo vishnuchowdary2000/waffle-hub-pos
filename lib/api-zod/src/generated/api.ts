@@ -251,7 +251,8 @@ export const ListOrdersQueryParams = zod.object({
   "status": zod.coerce.string().optional(),
   "search": zod.coerce.string().optional(),
   "date": zod.coerce.string().optional(),
-  "customerId": zod.coerce.number().optional()
+  "customerId": zod.coerce.number().optional(),
+  "source": zod.coerce.string().optional()
 })
 
 export const ListOrdersResponseItem = zod.object({
@@ -268,6 +269,7 @@ export const ListOrdersResponseItem = zod.object({
   "subtotalAmount": zod.number().optional(),
   "discountAmount": zod.number().optional(),
   "offerId": zod.number().nullish(),
+  "source": zod.string().optional(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -352,6 +354,7 @@ export const GetOrderResponse = zod.object({
   "subtotalAmount": zod.number().optional(),
   "discountAmount": zod.number().optional(),
   "offerId": zod.number().nullish(),
+  "source": zod.string().optional(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -420,6 +423,7 @@ export const UpdateOrderResponse = zod.object({
   "subtotalAmount": zod.number().optional(),
   "discountAmount": zod.number().optional(),
   "offerId": zod.number().nullish(),
+  "source": zod.string().optional(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -489,6 +493,7 @@ export const UpdateOrderStatusResponse = zod.object({
   "subtotalAmount": zod.number().optional(),
   "discountAmount": zod.number().optional(),
   "offerId": zod.number().nullish(),
+  "source": zod.string().optional(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -586,6 +591,7 @@ export const ReplaceOrderItemsResponse = zod.object({
   "subtotalAmount": zod.number().optional(),
   "discountAmount": zod.number().optional(),
   "offerId": zod.number().nullish(),
+  "source": zod.string().optional(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -780,6 +786,7 @@ export const UpdateSubOrderStatusResponse = zod.object({
   "subtotalAmount": zod.number().optional(),
   "discountAmount": zod.number().optional(),
   "offerId": zod.number().nullish(),
+  "source": zod.string().optional(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -1151,6 +1158,7 @@ export const GetDashboardResponse = zod.object({
   "subtotalAmount": zod.number().optional(),
   "discountAmount": zod.number().optional(),
   "offerId": zod.number().nullish(),
+  "source": zod.string().optional(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),

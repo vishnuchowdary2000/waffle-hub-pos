@@ -27,6 +27,7 @@ export interface Order {
   discountAmount?: number;
   /** @nullable */
   offerId?: number | null;
+  source?: string;
   createdAt: string;
   readyTime: string;
   updatedAt?: string;

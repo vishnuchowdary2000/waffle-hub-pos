@@ -128,6 +128,7 @@ export interface Order {
   discountAmount?: number;
   /** @nullable */
   offerId?: number | null;
+  source?: string;
   createdAt: string;
   readyTime: string;
   updatedAt?: string;
@@ -464,6 +465,7 @@ status?: string;
 search?: string;
 date?: string;
 customerId?: number;
+source?: string;
 };
 
 export type ListOffersParams = {
