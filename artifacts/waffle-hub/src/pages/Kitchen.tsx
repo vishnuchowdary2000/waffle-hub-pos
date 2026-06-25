@@ -474,11 +474,25 @@ function KitchenCard({
         </span>
       </div>
 
-      {/* Customer name */}
-      <div>
+      {/* Customer name + phone + payment status */}
+      <div className="space-y-1">
         <p className="text-2xl font-black text-foreground leading-tight tracking-tight">
           {order.customerName}
         </p>
+        {order.customerPhone && (
+          <p className="text-xs text-muted-foreground font-medium">📱 {order.customerPhone}</p>
+        )}
+        <div>
+          {order.payment && order.payment.balance <= 0 ? (
+            <span className="inline-flex items-center gap-1 text-xs font-bold text-green-400 bg-green-500/10 border border-green-500/30 px-2 py-0.5 rounded-full">
+              🟢 Paid
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/30 px-2 py-0.5 rounded-full">
+              🔴 Unpaid
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Items */}

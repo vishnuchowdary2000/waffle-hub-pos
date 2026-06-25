@@ -370,10 +370,10 @@ export default function Counter() {
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     <button
-                      onClick={() => updateStatus.mutate(
-                        { id: o.id, data: { status: "approved" } },
-                        { onSuccess: () => dismissNotif(o.id) }
-                      )}
+                      onClick={() => {
+                        dismissNotif(o.id);
+                        updateStatus.mutate({ id: o.id, data: { status: "approved" } });
+                      }}
                       className="text-xs font-bold bg-amber-500 hover:bg-amber-400 text-black rounded-md px-2 py-0.5 leading-tight"
                     >
                       Accept
