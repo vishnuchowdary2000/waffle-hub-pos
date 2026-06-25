@@ -313,6 +313,24 @@ export default function CustomerOrder() {
         </div>
         )}
 
+        {/* Need Help — contact number */}
+        {storeStatus?.contactNumber && (
+          <div className="flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-3">
+            <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+              <Phone size={14} className="text-primary" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Need Help?</p>
+              <a
+                href={`tel:${storeStatus.contactNumber.replace(/\s/g, "")}`}
+                className="font-bold text-primary text-sm hover:underline"
+              >
+                📞 Call: {storeStatus.contactNumber}
+              </a>
+            </div>
+          </div>
+        )}
+
         {/* Disclaimer */}
         <div className="flex gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-4 py-3">
           <Clock size={15} className="text-amber-400 mt-0.5 shrink-0" />

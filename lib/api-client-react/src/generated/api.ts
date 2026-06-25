@@ -60,6 +60,7 @@ import type {
   ProductSalesItem,
   ProductUpdate,
   ProductionCount,
+  PublicAddItemsInput,
   PublicCustomerProfile,
   PublicMenuCategory,
   PublicStats,
@@ -548,6 +549,148 @@ export function useTrackPublicOrder<TData = Awaited<ReturnType<typeof trackPubli
 
 
 
+
+export const getCancelPublicOrderUrl = (orderNumber: string,) => {
+
+
+
+
+  return `/api/public/orders/${orderNumber}/cancel`
+}
+
+/**
+ * @summary Cancel own order within 2-minute window (public)
+ */
+export const cancelPublicOrder = async (orderNumber: string, options?: RequestInit): Promise<OrderTrackingResult> => {
+
+  return customFetch<OrderTrackingResult>(getCancelPublicOrderUrl(orderNumber),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCancelPublicOrderMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelPublicOrder>>, TError,{orderNumber: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelPublicOrder>>, TError,{orderNumber: string}, TContext> => {
+
+const mutationKey = ['cancelPublicOrder'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelPublicOrder>>, {orderNumber: string}> = (props) => {
+          const {orderNumber} = props ?? {};
+
+          return  cancelPublicOrder(orderNumber,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelPublicOrderMutationResult = NonNullable<Awaited<ReturnType<typeof cancelPublicOrder>>>
+
+    export type CancelPublicOrderMutationError = ErrorType<void>
+
+    /**
+ * @summary Cancel own order within 2-minute window (public)
+ */
+export const useCancelPublicOrder = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelPublicOrder>>, TError,{orderNumber: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelPublicOrder>>,
+        TError,
+        {orderNumber: string},
+        TContext
+      > => {
+      return useMutation(getCancelPublicOrderMutationOptions(options));
+    }
+
+export const getAddPublicOrderItemsUrl = (orderNumber: string,) => {
+
+
+
+
+  return `/api/public/orders/${orderNumber}/add-items`
+}
+
+/**
+ * @summary Add items to an existing order within 5-minute window (public)
+ */
+export const addPublicOrderItems = async (orderNumber: string,
+    publicAddItemsInput: PublicAddItemsInput, options?: RequestInit): Promise<OrderTrackingResult> => {
+
+  return customFetch<OrderTrackingResult>(getAddPublicOrderItemsUrl(orderNumber),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      publicAddItemsInput,)
+  }
+);}
+
+
+
+
+export const getAddPublicOrderItemsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addPublicOrderItems>>, TError,{orderNumber: string;data: BodyType<PublicAddItemsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addPublicOrderItems>>, TError,{orderNumber: string;data: BodyType<PublicAddItemsInput>}, TContext> => {
+
+const mutationKey = ['addPublicOrderItems'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addPublicOrderItems>>, {orderNumber: string;data: BodyType<PublicAddItemsInput>}> = (props) => {
+          const {orderNumber,data} = props ?? {};
+
+          return  addPublicOrderItems(orderNumber,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddPublicOrderItemsMutationResult = NonNullable<Awaited<ReturnType<typeof addPublicOrderItems>>>
+    export type AddPublicOrderItemsMutationBody = BodyType<PublicAddItemsInput>
+    export type AddPublicOrderItemsMutationError = ErrorType<void>
+
+    /**
+ * @summary Add items to an existing order within 5-minute window (public)
+ */
+export const useAddPublicOrderItems = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addPublicOrderItems>>, TError,{orderNumber: string;data: BodyType<PublicAddItemsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addPublicOrderItems>>,
+        TError,
+        {orderNumber: string;data: BodyType<PublicAddItemsInput>},
+        TContext
+      > => {
+      return useMutation(getAddPublicOrderItemsMutationOptions(options));
+    }
 
 export const getListCategoriesUrl = () => {
 

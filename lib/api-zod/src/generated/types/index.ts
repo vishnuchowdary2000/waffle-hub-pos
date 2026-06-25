@@ -48,6 +48,7 @@ export * from './productInput';
 export * from './productionCount';
 export * from './productSalesItem';
 export * from './productUpdate';
+export * from './publicAddItemsInput';
 export * from './publicCustomerProfile';
 export * from './publicCustomerProfileRecentOrdersItem';
 export * from './publicMenuCategory';

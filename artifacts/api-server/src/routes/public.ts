@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and, inArray, desc } from "drizzle-orm";
 import { db, ordersTable, orderItemsTable, categoriesTable, productsTable, customersTable } from "@workspace/db";
-import { CreateOrderBody } from "@workspace/api-zod";
+import { CreateOrderBody, AddPublicOrderItemsBody } from "@workspace/api-zod";
 import { getStoreOpenStatus } from "./store";
 
 const router: IRouter = Router();
@@ -170,6 +170,100 @@ router.get("/public/orders/:orderNumber", async (req, res): Promise<void> => {
     notes: order.notes,
     createdAt: order.createdAt.toISOString(),
     items: items.map(i => ({ ...i, price: Number(i.price) })),
+  });
+});
+
+const CANCEL_WINDOW_MS = 2 * 60 * 1000;  // 2 minutes
+const ADD_WINDOW_MS    = 5 * 60 * 1000;  // 5 minutes
+const ADD_BLOCKED = ["preparing", "ready", "completed", "cancelled"];
+
+// ── POST /public/orders/:orderNumber/cancel ───────────────────────────────────
+router.post("/public/orders/:orderNumber/cancel", async (req, res): Promise<void> => {
+  const orderNumber = String(req.params.orderNumber);
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.orderNumber, orderNumber));
+  if (!order) { res.status(404).json({ error: "Order not found" }); return; }
+
+  if (order.status !== "pending_payment") {
+    res.status(403).json({ error: "Only unpaid orders can be self-cancelled" });
+    return;
+  }
+  const elapsed = Date.now() - order.createdAt.getTime();
+  if (elapsed > CANCEL_WINDOW_MS) {
+    res.status(403).json({ error: "Cancellation window has expired" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(ordersTable)
+    .set({ status: "cancelled" })
+    .where(eq(ordersTable.id, order.id))
+    .returning();
+
+  const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
+  res.json({
+    id: updated.id,
+    orderNumber: updated.orderNumber,
+    customerName: updated.customerName,
+    customerPhone: updated.customerPhone,
+    orderType: updated.orderType,
+    status: updated.status,
+    totalAmount: Number(updated.totalAmount),
+    notes: updated.notes,
+    createdAt: updated.createdAt.toISOString(),
+    items: items.map(i => ({ ...i, price: Number(i.price) })),
+  });
+});
+
+// ── POST /public/orders/:orderNumber/add-items ────────────────────────────────
+router.post("/public/orders/:orderNumber/add-items", async (req, res): Promise<void> => {
+  const orderNumber = String(req.params.orderNumber);
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.orderNumber, orderNumber));
+  if (!order) { res.status(404).json({ error: "Order not found" }); return; }
+
+  if (ADD_BLOCKED.includes(order.status)) {
+    res.status(403).json({ error: "Order can no longer be modified" });
+    return;
+  }
+  const elapsed = Date.now() - order.createdAt.getTime();
+  if (elapsed > ADD_WINDOW_MS) {
+    res.status(403).json({ error: "Addition window has expired" });
+    return;
+  }
+
+  const parsed = AddPublicOrderItemsBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+
+  for (const item of parsed.data.items) {
+    await db.insert(orderItemsTable).values({
+      orderId: order.id,
+      productId: item.productId ?? null,
+      productName: item.productName,
+      price: String(item.price),
+      quantity: item.quantity,
+      itemOrderType: item.itemOrderType ?? order.orderType,
+      isAddon: true,
+    });
+  }
+
+  const allItems = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
+  const newTotal = allItems.reduce((s, i) => s + Number(i.price) * i.quantity, 0);
+  const [updated] = await db
+    .update(ordersTable)
+    .set({ totalAmount: String(newTotal) })
+    .where(eq(ordersTable.id, order.id))
+    .returning();
+
+  res.json({
+    id: updated.id,
+    orderNumber: updated.orderNumber,
+    customerName: updated.customerName,
+    customerPhone: updated.customerPhone,
+    orderType: updated.orderType,
+    status: updated.status,
+    totalAmount: Number(updated.totalAmount),
+    notes: updated.notes,
+    createdAt: updated.createdAt.toISOString(),
+    items: allItems.map(i => ({ ...i, price: Number(i.price) })),
   });
 });
 

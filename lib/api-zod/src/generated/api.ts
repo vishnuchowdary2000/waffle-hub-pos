@@ -124,6 +124,84 @@ export const TrackPublicOrderResponse = zod.object({
 
 
 /**
+ * @summary Cancel own order within 2-minute window (public)
+ */
+export const CancelPublicOrderParams = zod.object({
+  "orderNumber": zod.coerce.string()
+})
+
+export const CancelPublicOrderResponse = zod.object({
+  "id": zod.number(),
+  "orderNumber": zod.string(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string().nullish(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "totalAmount": zod.number(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "productId": zod.number().nullish(),
+  "productName": zod.string(),
+  "price": zod.number(),
+  "quantity": zod.number(),
+  "itemOrderType": zod.string(),
+  "notes": zod.string().nullish(),
+  "isAddon": zod.boolean().optional()
+}))
+})
+
+
+/**
+ * @summary Add items to an existing order within 5-minute window (public)
+ */
+export const AddPublicOrderItemsParams = zod.object({
+  "orderNumber": zod.coerce.string()
+})
+
+
+
+
+
+
+export const AddPublicOrderItemsBody = zod.object({
+  "items": zod.array(zod.object({
+  "productId": zod.number().nullish(),
+  "productName": zod.string().min(1),
+  "price": zod.number(),
+  "quantity": zod.number().min(1),
+  "itemOrderType": zod.string().optional(),
+  "notes": zod.string().optional()
+})).min(1)
+})
+
+export const AddPublicOrderItemsResponse = zod.object({
+  "id": zod.number(),
+  "orderNumber": zod.string(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string().nullish(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "totalAmount": zod.number(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "productId": zod.number().nullish(),
+  "productName": zod.string(),
+  "price": zod.number(),
+  "quantity": zod.number(),
+  "itemOrderType": zod.string(),
+  "notes": zod.string().nullish(),
+  "isAddon": zod.boolean().optional()
+}))
+})
+
+
+/**
  * @summary List all categories
  */
 export const ListCategoriesResponseItem = zod.object({

@@ -216,6 +216,11 @@ export interface ReplaceOrderItemsInput {
   items: OrderItemInput[];
 }
 
+export interface PublicAddItemsInput {
+  /** @minItems 1 */
+  items: OrderItemInput[];
+}
+
 export interface OrderItemUpdate {
   /** @minimum 1 */
   quantity?: number;
