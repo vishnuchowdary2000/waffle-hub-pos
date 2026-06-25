@@ -1105,6 +1105,46 @@ paths:
         "204":
           description: Deleted
 
+  /production:
+    get:
+      operationId: listProductionCounts
+      summary: Get prepared counts for today
+      tags: [production]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProductionCount"
+
+  /production/{categoryName}/adjust:
+    post:
+      operationId: adjustProductionCount
+      summary: Increment or decrement prepared count for a category
+      tags: [production]
+      parameters:
+        - name: categoryName
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdjustProductionInput"
+      responses:
+        "200":
+          description: Updated production count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductionCount"
+
   /reports/daily:
     get:
       operationId: getDailyReport
@@ -1645,6 +1685,21 @@ components:
       properties:
         message: { type: string, minLength: 1 }
         enabled: { type: boolean }
+
+    ProductionCount:
+      type: object
+      required: [id, categoryName, quantity, sessionDate]
+      properties:
+        id:           { type: integer }
+        categoryName: { type: string }
+        quantity:     { type: integer }
+        sessionDate:  { type: string }
+
+    AdjustProductionInput:
+      type: object
+      required: [delta]
+      properties:
+        delta: { type: integer }
 
     OrderTrackingResult:
       type: object

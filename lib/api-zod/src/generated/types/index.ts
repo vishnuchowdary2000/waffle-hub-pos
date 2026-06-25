@@ -7,6 +7,7 @@
  */
 
 export * from './addAddonItemsInput';
+export * from './adjustProductionInput';
 export * from './category';
 export * from './categoryInput';
 export * from './categoryUpdate';
@@ -44,6 +45,7 @@ export * from './paymentInput';
 export * from './paymentUpdate';
 export * from './product';
 export * from './productInput';
+export * from './productionCount';
 export * from './productSalesItem';
 export * from './productUpdate';
 export * from './publicCustomerProfile';

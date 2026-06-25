@@ -21,6 +21,7 @@ import type {
 
 import type {
   AddAddonItemsInput,
+  AdjustProductionInput,
   Category,
   CategoryInput,
   CategoryUpdate,
@@ -58,6 +59,7 @@ import type {
   ProductInput,
   ProductSalesItem,
   ProductUpdate,
+  ProductionCount,
   PublicCustomerProfile,
   PublicMenuCategory,
   PublicStats,
@@ -4138,6 +4140,155 @@ export const useDeleteStoreAnnouncement = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteStoreAnnouncementMutationOptions(options));
+    }
+
+export const getListProductionCountsUrl = () => {
+
+
+
+
+  return `/api/production`
+}
+
+/**
+ * @summary Get prepared counts for today
+ */
+export const listProductionCounts = async ( options?: RequestInit): Promise<ProductionCount[]> => {
+
+  return customFetch<ProductionCount[]>(getListProductionCountsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListProductionCountsQueryKey = () => {
+    return [
+    `/api/production`
+    ] as const;
+    }
+
+
+export const getListProductionCountsQueryOptions = <TData = Awaited<ReturnType<typeof listProductionCounts>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProductionCounts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListProductionCountsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listProductionCounts>>> = ({ signal }) => listProductionCounts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listProductionCounts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListProductionCountsQueryResult = NonNullable<Awaited<ReturnType<typeof listProductionCounts>>>
+export type ListProductionCountsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get prepared counts for today
+ */
+
+export function useListProductionCounts<TData = Awaited<ReturnType<typeof listProductionCounts>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProductionCounts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListProductionCountsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getAdjustProductionCountUrl = (categoryName: string,) => {
+
+
+
+
+  return `/api/production/${categoryName}/adjust`
+}
+
+/**
+ * @summary Increment or decrement prepared count for a category
+ */
+export const adjustProductionCount = async (categoryName: string,
+    adjustProductionInput: AdjustProductionInput, options?: RequestInit): Promise<ProductionCount> => {
+
+  return customFetch<ProductionCount>(getAdjustProductionCountUrl(categoryName),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      adjustProductionInput,)
+  }
+);}
+
+
+
+
+export const getAdjustProductionCountMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adjustProductionCount>>, TError,{categoryName: string;data: BodyType<AdjustProductionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof adjustProductionCount>>, TError,{categoryName: string;data: BodyType<AdjustProductionInput>}, TContext> => {
+
+const mutationKey = ['adjustProductionCount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adjustProductionCount>>, {categoryName: string;data: BodyType<AdjustProductionInput>}> = (props) => {
+          const {categoryName,data} = props ?? {};
+
+          return  adjustProductionCount(categoryName,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdjustProductionCountMutationResult = NonNullable<Awaited<ReturnType<typeof adjustProductionCount>>>
+    export type AdjustProductionCountMutationBody = BodyType<AdjustProductionInput>
+    export type AdjustProductionCountMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Increment or decrement prepared count for a category
+ */
+export const useAdjustProductionCount = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adjustProductionCount>>, TError,{categoryName: string;data: BodyType<AdjustProductionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof adjustProductionCount>>,
+        TError,
+        {categoryName: string;data: BodyType<AdjustProductionInput>},
+        TContext
+      > => {
+      return useMutation(getAdjustProductionCountMutationOptions(options));
     }
 
 export const getGetDailyReportUrl = (params?: GetDailyReportParams,) => {

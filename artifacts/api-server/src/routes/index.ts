@@ -12,6 +12,7 @@ import authRouter, { seedDefaultUsers } from "./auth";
 import usersRouter from "./users";
 import publicRouter from "./public";
 import storeRouter from "./store";
+import productionRouter from "./production";
 
 const router: IRouter = Router();
 
@@ -28,6 +29,7 @@ router.use(offersRouter);
 router.use(dashboardRouter);
 router.use(reportsRouter);
 router.use(usersRouter);
+router.use(productionRouter);
 
 void seedDefaultUsers();
 

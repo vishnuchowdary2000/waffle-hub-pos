@@ -1397,6 +1397,37 @@ export const DeleteStoreAnnouncementParams = zod.object({
 })
 
 
+/**
+ * @summary Get prepared counts for today
+ */
+export const ListProductionCountsResponseItem = zod.object({
+  "id": zod.number(),
+  "categoryName": zod.string(),
+  "quantity": zod.number(),
+  "sessionDate": zod.string()
+})
+export const ListProductionCountsResponse = zod.array(ListProductionCountsResponseItem)
+
+
+/**
+ * @summary Increment or decrement prepared count for a category
+ */
+export const AdjustProductionCountParams = zod.object({
+  "categoryName": zod.coerce.string()
+})
+
+export const AdjustProductionCountBody = zod.object({
+  "delta": zod.number()
+})
+
+export const AdjustProductionCountResponse = zod.object({
+  "id": zod.number(),
+  "categoryName": zod.string(),
+  "quantity": zod.number(),
+  "sessionDate": zod.string()
+})
+
+
 export const GetDailyReportQueryParams = zod.object({
   "date": zod.coerce.string().optional()
 })

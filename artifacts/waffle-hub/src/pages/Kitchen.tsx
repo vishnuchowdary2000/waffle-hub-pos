@@ -3,7 +3,10 @@ import {
   useListProducts,
   useUpdateOrderStatus,
   useUpdateSubOrderStatus,
+  useListProductionCounts,
+  useAdjustProductionCount,
   getListOrdersQueryKey,
+  getListProductionCountsQueryKey,
   type ListOrdersQueryResult,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -94,6 +97,17 @@ export default function Kitchen() {
 
   const updateStatus = useUpdateOrderStatus();
   const updateSubStatus = useUpdateSubOrderStatus();
+
+  // Production tracking
+  const { data: productionCounts = [] } = useListProductionCounts({
+    query: { refetchInterval: 10000, queryKey: getListProductionCountsQueryKey() },
+  });
+  const adjustProduction = useAdjustProductionCount();
+  const adjust = (categoryName: string, delta: number) =>
+    adjustProduction.mutate(
+      { categoryName, data: { delta } },
+      { onSuccess: () => qc.invalidateQueries({ queryKey: getListProductionCountsQueryKey() }) }
+    );
 
   // Detect new orders and new items within existing orders
   useEffect(() => {
@@ -258,28 +272,64 @@ export default function Kitchen() {
         </div>
       </div>
 
-      {/* ── Production Summary strip ──────────────────────── */}
-      <div className="sticky top-[57px] z-20 bg-background/98 backdrop-blur border-b border-amber-500/25 px-4 py-2 flex items-center gap-3 overflow-x-auto shrink-0">
-        <div className="flex items-center gap-1.5 shrink-0">
-          <ClipboardList size={13} className="text-amber-400" />
-          <span className="text-xs font-black uppercase tracking-widest text-amber-400">Pending</span>
-        </div>
-        <div className="w-px h-4 bg-border/60 shrink-0" />
-        {pendingSummary.length === 0 ? (
-          <span className="text-xs text-muted-foreground italic">All clear — nothing pending</span>
-        ) : (
-          <div className="flex items-center gap-2">
-            {pendingSummary.map(([cat, qty]) => (
-              <div
-                key={cat}
-                className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/25 rounded-full px-3 py-0.5 shrink-0"
-              >
-                <span className="text-xs font-medium text-amber-200/80">{cat}</span>
-                <span className="text-sm font-black text-amber-400 leading-none">{qty}</span>
-              </div>
-            ))}
+      {/* ── Production Tracker strip ──────────────────────── */}
+      <div className="sticky top-[57px] z-20 bg-background/98 backdrop-blur border-b border-amber-500/25 px-4 py-2.5 shrink-0">
+        <div className="flex items-center gap-3 overflow-x-auto">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <ClipboardList size={13} className="text-amber-400" />
+            <span className="text-xs font-black uppercase tracking-widest text-amber-400">Production</span>
           </div>
-        )}
+          <div className="w-px h-4 bg-border/60 shrink-0" />
+          {pendingSummary.length === 0 ? (
+            <span className="text-xs text-muted-foreground italic">All clear — nothing pending</span>
+          ) : (
+            <div className="flex items-center gap-3">
+              {pendingSummary.map(([cat, pending]) => {
+                const prepared = productionCounts.find(p => p.categoryName === cat)?.quantity ?? 0;
+                const remaining = Math.max(0, pending - prepared);
+                return (
+                  <div key={cat}
+                    className="flex items-center gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-3 py-1.5 shrink-0">
+                    {/* Category label */}
+                    <span className="text-xs font-black text-amber-300 min-w-[40px]">{cat}</span>
+                    <div className="w-px h-4 bg-border/60" />
+                    {/* Pending */}
+                    <div className="text-center">
+                      <div className="text-[10px] text-muted-foreground font-medium leading-none mb-0.5">Pending</div>
+                      <div className="text-base font-black text-amber-400 leading-none">{pending}</div>
+                    </div>
+                    <div className="w-px h-4 bg-border/60" />
+                    {/* Prepared with +/- */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => adjust(cat, -1)}
+                        disabled={prepared === 0}
+                        className="w-6 h-6 rounded-md bg-secondary border border-border text-muted-foreground hover:text-foreground hover:border-primary/40 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-sm font-bold transition-colors"
+                      >−</button>
+                      <div className="text-center min-w-[36px]">
+                        <div className="text-[10px] text-muted-foreground font-medium leading-none mb-0.5">Prepared</div>
+                        <div className="text-base font-black text-green-400 leading-none">{prepared}</div>
+                      </div>
+                      <button
+                        onClick={() => adjust(cat, +1)}
+                        className="w-6 h-6 rounded-md bg-secondary border border-border text-muted-foreground hover:text-foreground hover:border-primary/40 flex items-center justify-center text-sm font-bold transition-colors"
+                      >＋</button>
+                    </div>
+                    <div className="w-px h-4 bg-border/60" />
+                    {/* Remaining */}
+                    <div className="text-center">
+                      <div className="text-[10px] text-muted-foreground font-medium leading-none mb-0.5">Remaining</div>
+                      <div className={cn(
+                        "text-base font-black leading-none",
+                        remaining === 0 ? "text-green-400" : remaining <= 3 ? "text-amber-300" : "text-red-400"
+                      )}>{remaining}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {isLoading ? (

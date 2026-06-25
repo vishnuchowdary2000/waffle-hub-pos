@@ -444,6 +444,17 @@ export interface StoreAnnouncementInput {
   enabled?: boolean;
 }
 
+export interface ProductionCount {
+  id: number;
+  categoryName: string;
+  quantity: number;
+  sessionDate: string;
+}
+
+export interface AdjustProductionInput {
+  delta: number;
+}
+
 export interface OrderTrackingResult {
   id: number;
   orderNumber: string;
