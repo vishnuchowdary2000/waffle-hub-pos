@@ -79,6 +79,7 @@ export interface OrderItem {
   itemOrderType: string;
   /** @nullable */
   notes?: string | null;
+  isAddon?: boolean;
 }
 
 export interface Payment {
@@ -203,6 +204,10 @@ export interface OrderUpdate {
 
 export interface OrderStatusUpdate {
   status: string;
+}
+
+export interface AddAddonItemsInput {
+  items: OrderItemInput[];
 }
 
 export interface ReplaceOrderItemsInput {

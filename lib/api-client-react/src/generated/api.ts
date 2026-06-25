@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AddAddonItemsInput,
   Category,
   CategoryInput,
   CategoryUpdate,
@@ -1655,6 +1656,78 @@ export const useReplaceOrderItems = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getReplaceOrderItemsMutationOptions(options));
+    }
+
+export const getAddAddonItemsUrl = (id: number,) => {
+
+
+
+
+  return `/api/orders/${id}/addon-items`
+}
+
+/**
+ * @summary Append addon items to an unpaid order in the kitchen
+ */
+export const addAddonItems = async (id: number,
+    addAddonItemsInput: AddAddonItemsInput, options?: RequestInit): Promise<Order> => {
+
+  return customFetch<Order>(getAddAddonItemsUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      addAddonItemsInput,)
+  }
+);}
+
+
+
+
+export const getAddAddonItemsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addAddonItems>>, TError,{id: number;data: BodyType<AddAddonItemsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addAddonItems>>, TError,{id: number;data: BodyType<AddAddonItemsInput>}, TContext> => {
+
+const mutationKey = ['addAddonItems'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addAddonItems>>, {id: number;data: BodyType<AddAddonItemsInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  addAddonItems(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddAddonItemsMutationResult = NonNullable<Awaited<ReturnType<typeof addAddonItems>>>
+    export type AddAddonItemsMutationBody = BodyType<AddAddonItemsInput>
+    export type AddAddonItemsMutationError = ErrorType<void>
+
+    /**
+ * @summary Append addon items to an unpaid order in the kitchen
+ */
+export const useAddAddonItems = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addAddonItems>>, TError,{id: number;data: BodyType<AddAddonItemsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addAddonItems>>,
+        TError,
+        {id: number;data: BodyType<AddAddonItemsInput>},
+        TContext
+      > => {
+      return useMutation(getAddAddonItemsMutationOptions(options));
     }
 
 export const getUpdateOrderItemUrl = (id: number,

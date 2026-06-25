@@ -445,6 +445,33 @@ paths:
         "409":
           description: Order not in editable status
 
+  /orders/{id}/addon-items:
+    post:
+      operationId: addAddonItems
+      summary: Append addon items to an unpaid order in the kitchen
+      tags: [orders]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddAddonItemsInput"
+      responses:
+        "200":
+          description: Updated order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "403":
+          description: Order is paid or not in kitchen
+
   /orders/{id}/items/{itemId}:
     patch:
       operationId: updateOrderItem
@@ -1296,6 +1323,16 @@ components:
         quantity:      { type: integer }
         itemOrderType: { type: string }
         notes:         { type: ["string", "null"] }
+        isAddon:       { type: boolean }
+
+    AddAddonItemsInput:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItemInput"
 
     ReplaceOrderItemsInput:
       type: object

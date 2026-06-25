@@ -35,6 +35,7 @@ export const orderItemsTable = pgTable("order_items", {
   quantity: integer("quantity").notNull().default(1),
   itemOrderType: text("item_order_type").notNull().default("dine_in"),
   notes: text("notes"),
+  isAddon: boolean("is_addon").notNull().default(false),
 });
 
 export const insertOrderItemSchema = createInsertSchema(orderItemsTable).omit({ id: true });

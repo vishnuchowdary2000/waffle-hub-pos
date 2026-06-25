@@ -24,6 +24,7 @@ import {
   ReplaceOrderItemsBody,
   UpdateSubOrderStatusParams,
   UpdateSubOrderStatusBody,
+  AddAddonItemsBody,
 } from "@workspace/api-zod";
 
 const EDITABLE_STATUSES = ["pending_payment", "approved", "preparing"];
@@ -403,6 +404,70 @@ router.put("/orders/:id/items", async (req, res): Promise<void> => {
   // Sync sub-orders to match the new item set (preserves existing sub-order statuses)
   const [currentOrder] = await db.select().from(ordersTable).where(eq(ordersTable.id, params.data.id));
   await syncSubOrders(params.data.id, currentOrder?.status ?? "pending_payment");
+
+  const full = await getFullOrder(params.data.id);
+  res.json(full);
+});
+
+// Add addon items to an unpaid kitchen order
+router.post("/orders/:id/addon-items", async (req, res): Promise<void> => {
+  const params = GetOrderParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+  const parsed = AddAddonItemsBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, params.data.id));
+  if (!order) { res.status(404).json({ error: "Order not found" }); return; }
+
+  const KITCHEN_STATUSES = ["approved", "preparing", "ready"];
+  if (!KITCHEN_STATUSES.includes(order.status)) {
+    res.status(409).json({ error: `Order is not in kitchen (status: ${order.status})` });
+    return;
+  }
+
+  // Block if already fully paid
+  const [payment] = await db.select().from(paymentsTable).where(eq(paymentsTable.orderId, params.data.id));
+  if (payment) {
+    const totalPaid = Number(payment.cashAmount) + Number(payment.upiAmount) + Number(payment.cardAmount);
+    if (totalPaid >= Number(payment.totalAmount)) {
+      res.status(403).json({ error: "Cannot modify a fully paid order" });
+      return;
+    }
+  }
+
+  if (parsed.data.items.length === 0) {
+    res.status(400).json({ error: "No items provided" });
+    return;
+  }
+
+  // Insert addon items (flagged as is_addon=true)
+  await db.insert(orderItemsTable).values(
+    parsed.data.items.map(item => ({
+      orderId: params.data.id,
+      productId: item.productId ?? null,
+      productName: item.productName,
+      price: String(item.price),
+      quantity: item.quantity,
+      itemOrderType: item.itemOrderType ?? order.orderType ?? "dine_in",
+      notes: item.notes ?? null,
+      isAddon: true,
+    }))
+  );
+
+  // Recalculate total
+  const allItems = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, params.data.id));
+  const total = allItems.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0);
+
+  // Reset to approved so Kitchen picks up the new items; update total
+  await db.update(ordersTable)
+    .set({ totalAmount: String(total), status: "approved" })
+    .where(eq(ordersTable.id, params.data.id));
+
+  // Keep payment record in sync with new total
+  await syncPaymentTotal(params.data.id, total);
+
+  // Re-sync sub-orders for the updated item set
+  await syncSubOrders(params.data.id, "approved");
 
   const full = await getFullOrder(params.data.id);
   res.json(full);

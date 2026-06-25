@@ -17,4 +17,5 @@ export interface OrderItem {
   itemOrderType: string;
   /** @nullable */
   notes?: string | null;
+  isAddon?: boolean;
 }

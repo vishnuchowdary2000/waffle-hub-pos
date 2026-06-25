@@ -407,6 +407,8 @@ function KitchenCard({
   const displayStatus = isSubMode ? subOrder!.status : order.status;
   const displayType   = isSubMode ? subOrder!.orderType : order.orderType;
   const displayItems  = isSubMode ? (subItems ?? []) : order.items;
+  const originalItems = displayItems.filter(i => !i.isAddon);
+  const addonItems    = displayItems.filter(i => i.isAddon);
   const displayNumber = isSubMode
     ? `${order.orderNumber}${subOrder!.subCode}`
     : order.orderNumber;
@@ -466,6 +468,11 @@ function KitchenCard({
         {hasNewItems && (
           <span className="flex items-center gap-1 text-xs font-bold text-orange-400 bg-orange-500/15 border border-orange-500/30 px-2 py-0.5 rounded-full">
             <Sparkles size={11} /> UPDATED
+          </span>
+        )}
+        {addonItems.length > 0 && !isSubMode && (
+          <span className="flex items-center gap-1 text-xs font-bold text-orange-300 bg-orange-500/20 border border-orange-400/40 px-2 py-0.5 rounded-full">
+            ＋ ADD-ON
           </span>
         )}
         <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
@@ -540,11 +547,29 @@ function KitchenCard({
           )}
         </div>
       ) : (
-        // Regular order: flat list
-        <div className="space-y-1 border-t border-border/40 pt-3">
-          {displayItems.map(item => (
-            <ItemRow key={item.id} item={item} highlightedItemIds={highlightedItemIds} />
-          ))}
+        // Regular order: original items + addon section
+        <div className="space-y-3 border-t border-border/40 pt-3">
+          {originalItems.length > 0 && (
+            <div className="space-y-1">
+              {originalItems.map(item => (
+                <ItemRow key={item.id} item={item} highlightedItemIds={highlightedItemIds} />
+              ))}
+            </div>
+          )}
+          {addonItems.length > 0 && (
+            <div className="rounded-xl border border-orange-500/40 bg-orange-500/5 p-2.5 space-y-1">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Sparkles size={11} className="text-orange-400" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-orange-400">Add-on Items</span>
+                <span className="ml-auto text-[10px] text-orange-400/70 font-semibold">
+                  {addonItems.reduce((s, i) => s + i.quantity, 0)} new
+                </span>
+              </div>
+              {addonItems.map(item => (
+                <ItemRow key={item.id} item={item} highlightedItemIds={highlightedItemIds} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 

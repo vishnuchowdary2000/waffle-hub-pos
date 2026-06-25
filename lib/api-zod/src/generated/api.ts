@@ -117,7 +117,8 @@ export const TrackPublicOrderResponse = zod.object({
   "price": zod.number(),
   "quantity": zod.number(),
   "itemOrderType": zod.string(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "isAddon": zod.boolean().optional()
 }))
 })
 
@@ -281,7 +282,8 @@ export const ListOrdersResponseItem = zod.object({
   "price": zod.number(),
   "quantity": zod.number(),
   "itemOrderType": zod.string(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "isAddon": zod.boolean().optional()
 })),
   "payment": zod.object({
   "id": zod.number(),
@@ -366,7 +368,8 @@ export const GetOrderResponse = zod.object({
   "price": zod.number(),
   "quantity": zod.number(),
   "itemOrderType": zod.string(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "isAddon": zod.boolean().optional()
 })),
   "payment": zod.object({
   "id": zod.number(),
@@ -435,7 +438,8 @@ export const UpdateOrderResponse = zod.object({
   "price": zod.number(),
   "quantity": zod.number(),
   "itemOrderType": zod.string(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "isAddon": zod.boolean().optional()
 })),
   "payment": zod.object({
   "id": zod.number(),
@@ -505,7 +509,8 @@ export const UpdateOrderStatusResponse = zod.object({
   "price": zod.number(),
   "quantity": zod.number(),
   "itemOrderType": zod.string(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "isAddon": zod.boolean().optional()
 })),
   "payment": zod.object({
   "id": zod.number(),
@@ -603,7 +608,88 @@ export const ReplaceOrderItemsResponse = zod.object({
   "price": zod.number(),
   "quantity": zod.number(),
   "itemOrderType": zod.string(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "isAddon": zod.boolean().optional()
+})),
+  "payment": zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "totalAmount": zod.number(),
+  "cashAmount": zod.number(),
+  "upiAmount": zod.number(),
+  "cardAmount": zod.number(),
+  "discountType": zod.string().nullable(),
+  "discountValue": zod.number(),
+  "discountAmount": zod.number(),
+  "charityAmount": zod.number(),
+  "finalAmount": zod.number(),
+  "totalPaid": zod.number(),
+  "balance": zod.number(),
+  "status": zod.string(),
+  "createdAt": zod.string()
+}).optional(),
+  "subOrders": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "subCode": zod.string(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})).optional()
+})
+
+
+/**
+ * @summary Append addon items to an unpaid order in the kitchen
+ */
+export const AddAddonItemsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+
+export const AddAddonItemsBody = zod.object({
+  "items": zod.array(zod.object({
+  "productId": zod.number().nullish(),
+  "productName": zod.string().min(1),
+  "price": zod.number(),
+  "quantity": zod.number().min(1),
+  "itemOrderType": zod.string().optional(),
+  "notes": zod.string().optional()
+}))
+})
+
+export const AddAddonItemsResponse = zod.object({
+  "id": zod.number(),
+  "orderNumber": zod.string(),
+  "customerId": zod.number().nullish(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string().nullish(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "notes": zod.string().nullish(),
+  "priority": zod.boolean().optional(),
+  "totalAmount": zod.number(),
+  "subtotalAmount": zod.number().optional(),
+  "discountAmount": zod.number().optional(),
+  "offerId": zod.number().nullish(),
+  "source": zod.string().optional(),
+  "createdAt": zod.string(),
+  "readyTime": zod.string(),
+  "updatedAt": zod.string().optional(),
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "productId": zod.number().nullish(),
+  "productName": zod.string(),
+  "price": zod.number(),
+  "quantity": zod.number(),
+  "itemOrderType": zod.string(),
+  "notes": zod.string().nullish(),
+  "isAddon": zod.boolean().optional()
 })),
   "payment": zod.object({
   "id": zod.number(),
@@ -655,7 +741,8 @@ export const UpdateOrderItemResponse = zod.object({
   "price": zod.number(),
   "quantity": zod.number(),
   "itemOrderType": zod.string(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "isAddon": zod.boolean().optional()
 })
 
 
@@ -798,7 +885,8 @@ export const UpdateSubOrderStatusResponse = zod.object({
   "price": zod.number(),
   "quantity": zod.number(),
   "itemOrderType": zod.string(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "isAddon": zod.boolean().optional()
 })),
   "payment": zod.object({
   "id": zod.number(),
@@ -1170,7 +1258,8 @@ export const GetDashboardResponse = zod.object({
   "price": zod.number(),
   "quantity": zod.number(),
   "itemOrderType": zod.string(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "isAddon": zod.boolean().optional()
 })),
   "payment": zod.object({
   "id": zod.number(),
