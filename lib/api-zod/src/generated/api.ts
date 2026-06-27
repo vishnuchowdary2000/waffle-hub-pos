@@ -1393,6 +1393,16 @@ export const GetStoreSettingsResponse = zod.object({
   "openTime": zod.string(),
   "closeTime": zod.string(),
   "contactNumber": zod.string().optional(),
+  "receiptPrinting": zod.boolean().optional(),
+  "kotPrinting": zod.boolean().optional(),
+  "autoPrint": zod.boolean().optional(),
+  "paperSize": zod.string().optional(),
+  "shopName": zod.string().optional(),
+  "shopAddress": zod.string().optional(),
+  "shopPhone": zod.string().optional(),
+  "fssaiNumber": zod.string().optional(),
+  "gstNumber": zod.string().optional(),
+  "thankYouMessage": zod.string().optional(),
   "updatedAt": zod.string()
 })
 
@@ -1405,7 +1415,17 @@ export const UpdateStoreSettingsBody = zod.object({
   "isOpen": zod.boolean().optional(),
   "openTime": zod.string().optional(),
   "closeTime": zod.string().optional(),
-  "contactNumber": zod.string().optional()
+  "contactNumber": zod.string().optional(),
+  "receiptPrinting": zod.boolean().optional(),
+  "kotPrinting": zod.boolean().optional(),
+  "autoPrint": zod.boolean().optional(),
+  "paperSize": zod.string().optional(),
+  "shopName": zod.string().optional(),
+  "shopAddress": zod.string().optional(),
+  "shopPhone": zod.string().optional(),
+  "fssaiNumber": zod.string().optional(),
+  "gstNumber": zod.string().optional(),
+  "thankYouMessage": zod.string().optional()
 })
 
 export const UpdateStoreSettingsResponse = zod.object({
@@ -1414,6 +1434,16 @@ export const UpdateStoreSettingsResponse = zod.object({
   "openTime": zod.string(),
   "closeTime": zod.string(),
   "contactNumber": zod.string().optional(),
+  "receiptPrinting": zod.boolean().optional(),
+  "kotPrinting": zod.boolean().optional(),
+  "autoPrint": zod.boolean().optional(),
+  "paperSize": zod.string().optional(),
+  "shopName": zod.string().optional(),
+  "shopAddress": zod.string().optional(),
+  "shopPhone": zod.string().optional(),
+  "fssaiNumber": zod.string().optional(),
+  "gstNumber": zod.string().optional(),
+  "thankYouMessage": zod.string().optional(),
   "updatedAt": zod.string()
 })
 
@@ -1472,6 +1502,39 @@ export const UpdateStoreAnnouncementResponse = zod.object({
  */
 export const DeleteStoreAnnouncementParams = zod.object({
   "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary List print history for an order
+ */
+export const ListPrintHistoryQueryParams = zod.object({
+  "orderId": zod.coerce.number().optional()
+})
+
+export const ListPrintHistoryResponseItem = zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "orderNumber": zod.string(),
+  "type": zod.string(),
+  "action": zod.string(),
+  "printedBy": zod.string(),
+  "paperSize": zod.string(),
+  "printedAt": zod.string()
+})
+export const ListPrintHistoryResponse = zod.array(ListPrintHistoryResponseItem)
+
+
+/**
+ * @summary Log a print action (receipt or KOT)
+ */
+export const LogPrintBody = zod.object({
+  "orderId": zod.number(),
+  "orderNumber": zod.string(),
+  "type": zod.string(),
+  "action": zod.string(),
+  "printedBy": zod.string(),
+  "paperSize": zod.string()
 })
 
 

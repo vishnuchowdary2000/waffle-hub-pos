@@ -35,7 +35,9 @@ import {
   TrendingUp, TrendingDown, ShieldCheck,
   UserCog, KeyRound, ToggleLeft, ToggleRight, ChefHat, ShoppingBag,
   Store, Megaphone, Clock, Check, Pencil, Phone,
+  Printer, MapPin, FileText,
 } from "lucide-react";
+import { type PaperSize, triggerBrowserPrint, generateReceiptHTML } from "@/lib/printService";
 
 type Tab = "customers" | "expenses" | "reports" | "users" | "store";
 
@@ -726,6 +728,15 @@ function StoreTab() {
   const [contactNumber, setContactNumber] = useState("");
   const [contactSaved, setContactSaved] = useState(false);
 
+  // Shop info + print settings state
+  const [shopName, setShopName] = useState("");
+  const [shopAddress, setShopAddress] = useState("");
+  const [shopPhone, setShopPhone] = useState("");
+  const [fssaiNumber, setFssaiNumber] = useState("");
+  const [gstNumber, setGstNumber] = useState("");
+  const [thankYouMessage, setThankYouMessage] = useState("");
+  const [shopInfoSaved, setShopInfoSaved] = useState(false);
+
   // Sync local time inputs when settings load
   const loadedOpenTime = settings?.openTime ?? "";
   const loadedCloseTime = settings?.closeTime ?? "";
@@ -773,6 +784,76 @@ function StoreTab() {
         },
       }
     );
+  };
+
+  const togglePrintSetting = (key: "receiptPrinting" | "kotPrinting" | "autoPrint", value: boolean) => {
+    updateSettings.mutate(
+      { data: { [key]: value } },
+      { onSuccess: () => qc.invalidateQueries({ queryKey: getGetStoreSettingsQueryKey() }) }
+    );
+  };
+
+  const savePaperSize = (size: string) => {
+    updateSettings.mutate(
+      { data: { paperSize: size } },
+      { onSuccess: () => qc.invalidateQueries({ queryKey: getGetStoreSettingsQueryKey() }) }
+    );
+  };
+
+  const saveShopInfo = () => {
+    updateSettings.mutate(
+      {
+        data: {
+          shopName:        shopName        !== "" ? shopName        : (settings?.shopName        ?? "The Waffle Hub"),
+          shopAddress:     shopAddress     !== "" ? shopAddress     : (settings?.shopAddress     ?? ""),
+          shopPhone:       shopPhone       !== "" ? shopPhone       : (settings?.shopPhone       ?? ""),
+          fssaiNumber:     fssaiNumber     !== "" ? fssaiNumber     : (settings?.fssaiNumber     ?? ""),
+          gstNumber:       gstNumber       !== "" ? gstNumber       : (settings?.gstNumber       ?? ""),
+          thankYouMessage: thankYouMessage !== "" ? thankYouMessage : (settings?.thankYouMessage ?? "Thank you for visiting! See you again."),
+        },
+      },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getGetStoreSettingsQueryKey() });
+          setShopInfoSaved(true);
+          setTimeout(() => setShopInfoSaved(false), 2000);
+        },
+      }
+    );
+  };
+
+  const previewReceipt = () => {
+    const shopInfo = {
+      shopName:        shopName        || settings?.shopName        || "The Waffle Hub",
+      shopAddress:     shopAddress     || settings?.shopAddress     || "",
+      shopPhone:       shopPhone       || settings?.shopPhone       || "",
+      fssaiNumber:     fssaiNumber     || settings?.fssaiNumber     || "",
+      gstNumber:       gstNumber       || settings?.gstNumber       || "",
+      thankYouMessage: thankYouMessage || settings?.thankYouMessage || "Thank you for visiting! See you again.",
+      paperSize:       (settings?.paperSize ?? "80mm") as PaperSize,
+    };
+    const sampleReceipt = {
+      orderNumber: "ORD-SAMPLE",
+      orderType: "dine_in",
+      customerName: "Sample Customer",
+      customerPhone: "+91 98765 43210",
+      specialInstructions: "No onions please",
+      items: [
+        { productName: "Dark & White Fantasy", quantity: 2, price: 90, isAddon: false },
+        { productName: "Biscoff Crumble", quantity: 1, price: 60, isAddon: false },
+        { productName: "Extra Sauce", quantity: 1, price: 20, isAddon: true },
+      ],
+      totalAmount: 260,
+      cashAmount: 300,
+      upiAmount: 0,
+      cardAmount: 0,
+      discountAmount: 0,
+      charityAmount: 2,
+      balance: -40,
+      cashierName: "Admin",
+      createdAt: new Date().toISOString(),
+    };
+    triggerBrowserPrint(generateReceiptHTML(sampleReceipt, shopInfo), shopInfo.paperSize);
   };
 
   // Announcements
@@ -1080,6 +1161,112 @@ function StoreTab() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* ── Printing ──────────────────────────────────────────────────────── */}
+      <div className="bg-card border border-card-border rounded-xl p-5 space-y-5">
+        <div className="flex items-center gap-2.5">
+          <Printer size={16} className="text-primary" />
+          <h2 className="text-sm font-bold text-foreground">Printing Settings</h2>
+        </div>
+
+        {/* Toggles */}
+        <div className="space-y-3">
+          {([
+            { key: "receiptPrinting" as const, label: "Receipt Printing", desc: "Show print buttons on the Billing page" },
+            { key: "kotPrinting"     as const, label: "KOT Printing",     desc: "Show Print KOT button on Kitchen cards" },
+            { key: "autoPrint"       as const, label: "Auto-Print KOT",   desc: "Automatically trigger KOT print when order is approved" },
+          ] as const).map(({ key, label, desc }) => {
+            const active = !!(settings?.[key]);
+            return (
+              <div key={key} className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{label}</p>
+                  <p className="text-xs text-muted-foreground">{desc}</p>
+                </div>
+                <button
+                  onClick={() => togglePrintSetting(key, !active)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors shrink-0",
+                    active
+                      ? "bg-primary/15 text-primary border-primary/30 hover:bg-primary/25"
+                      : "bg-secondary text-muted-foreground border-border hover:text-foreground"
+                  )}
+                >
+                  {active ? <><ToggleRight size={14} /> ON</> : <><ToggleLeft size={14} /> OFF</>}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Paper size */}
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Paper Size</p>
+          <div className="flex gap-2">
+            {(["58mm", "80mm", "A4"] as const).map(size => (
+              <button
+                key={size}
+                onClick={() => savePaperSize(size)}
+                className={cn(
+                  "flex-1 py-2 rounded-xl text-xs font-bold border transition-colors",
+                  (settings?.paperSize ?? "80mm") === size
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-secondary text-muted-foreground border-border hover:text-foreground"
+                )}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Preview receipt */}
+        <button
+          onClick={previewReceipt}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary text-muted-foreground border border-border hover:text-foreground text-xs font-semibold transition-colors"
+        >
+          <FileText size={13} /> Preview Sample Receipt
+        </button>
+      </div>
+
+      {/* ── Shop Info ─────────────────────────────────────────────────────── */}
+      <div className="bg-card border border-card-border rounded-xl p-5 space-y-4">
+        <div className="flex items-center gap-2.5">
+          <MapPin size={16} className="text-primary" />
+          <h2 className="text-sm font-bold text-foreground">Shop Info (Printed on Receipts)</h2>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3">
+          {([
+            { key: "shopName",        label: "Shop Name",          placeholder: settings?.shopName        || "The Waffle Hub",          state: shopName,        set: setShopName },
+            { key: "shopAddress",     label: "Address",            placeholder: settings?.shopAddress     || "Your shop address…",       state: shopAddress,     set: setShopAddress },
+            { key: "shopPhone",       label: "Phone",              placeholder: settings?.shopPhone       || "+91 98765 43210",          state: shopPhone,       set: setShopPhone },
+            { key: "fssaiNumber",     label: "FSSAI Number",       placeholder: settings?.fssaiNumber     || "e.g. 12345678901234",      state: fssaiNumber,     set: setFssaiNumber },
+            { key: "gstNumber",       label: "GST Number",         placeholder: settings?.gstNumber       || "e.g. 29ABCDE1234F1Z5",     state: gstNumber,       set: setGstNumber },
+            { key: "thankYouMessage", label: "Thank-You Message",  placeholder: settings?.thankYouMessage || "Thank you for visiting!",  state: thankYouMessage, set: setThankYouMessage },
+          ] as const).map(({ key, label, placeholder, state, set }) => (
+            <div key={key}>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">{label}</label>
+              <input
+                value={state}
+                onChange={e => set(e.target.value)}
+                placeholder={placeholder}
+                className="w-full bg-secondary border border-input rounded-xl px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={saveShopInfo}
+          disabled={updateSettings.isPending}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-all"
+        >
+          {shopInfoSaved
+            ? <><Check size={14} /> Saved!</>
+            : <><MapPin size={14} /> Save Shop Info</>}
+        </button>
       </div>
 
       {/* Delete confirm modal */}

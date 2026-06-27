@@ -12,9 +12,12 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { playNotificationSound } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { useGetStoreSettings, getGetStoreSettingsQueryKey } from "@workspace/api-client-react";
+import { type PaperSize, printKOT } from "@/lib/printService";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Clock, RefreshCw, ChefHat, ShoppingBag,
+  Clock, RefreshCw, ChefHat, ShoppingBag, Printer,
   UtensilsCrossed, Zap, Sparkles, ClipboardList,
 } from "lucide-react";
 
@@ -83,6 +86,10 @@ function buildColumns(orders: Order[]): { dineIn: KitchenItem[]; takeaway: Kitch
 
 export default function Kitchen() {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const { data: settings } = useGetStoreSettings({
+    query: { queryKey: getGetStoreSettingsQueryKey() },
+  });
 
   const prevOrderIds = useRef<Set<number>>(new Set());
   const orderItemSnapshot = useRef<Map<number, Set<number>>>(new Map());
@@ -170,6 +177,40 @@ export default function Kitchen() {
   const changeSubStatus = (subId: number, status: string) =>
     updateSubStatus.mutate({ id: subId, data: { status } }, { onSuccess: invalidate });
 
+  const handlePrintKOT = (order: Order, subOrder?: SubOrder) => {
+    const cashierName = user?.displayName ?? user?.username ?? "Staff";
+    const displayItems = subOrder
+      ? order.items.filter(i => i.itemOrderType === subOrder.orderType)
+      : order.items;
+    printKOT(
+      {
+        orderNumber: order.orderNumber,
+        subCode: subOrder?.subCode,
+        orderType: subOrder?.orderType ?? order.orderType,
+        customerName: order.customerName,
+        specialInstructions: order.notes,
+        items: displayItems.map(item => ({
+          productName: item.productName,
+          quantity: item.quantity,
+          specialInstructions: item.notes,
+          isAddon: item.isAddon,
+        })),
+        createdAt: order.createdAt,
+      },
+      {
+        shopName:        settings?.shopName        ?? "The Waffle Hub",
+        shopAddress:     settings?.shopAddress     ?? "",
+        shopPhone:       settings?.shopPhone       ?? "",
+        fssaiNumber:     settings?.fssaiNumber     ?? "",
+        gstNumber:       settings?.gstNumber       ?? "",
+        thankYouMessage: settings?.thankYouMessage ?? "Thank you!",
+        paperSize:       (settings?.paperSize      ?? "80mm") as PaperSize,
+      },
+      order.id,
+      cashierName
+    );
+  };
+
   const highlightedItemIds = new Set<number>(
     [...newItemHighlights.entries()]
       .filter(([, exp]) => exp > Date.now())
@@ -227,6 +268,8 @@ export default function Kitchen() {
   const activeCount = new Set(orders.map(o => o.id)).size;
   const totalCards = dineIn.length + takeaway.length;
 
+  const kotPrinting = settings?.kotPrinting ?? false;
+
   const renderCard = (item: KitchenItem) =>
     item.kind === "sub" ? (
       <KitchenCard
@@ -237,6 +280,8 @@ export default function Kitchen() {
         subItems={item.order.items.filter(i => i.itemOrderType === item.subOrder.orderType)}
         onPrepare={() => changeSubStatus(item.subOrder.id, "preparing")}
         onReady={() => changeSubStatus(item.subOrder.id, "ready")}
+        kotPrinting={kotPrinting}
+        onPrintKOT={() => handlePrintKOT(item.order, item.subOrder)}
       />
     ) : (
       <KitchenCard
@@ -245,6 +290,8 @@ export default function Kitchen() {
         highlightedItemIds={highlightedItemIds}
         onPrepare={() => changeStatus(item.order.id, "preparing")}
         onReady={() => changeStatus(item.order.id, "ready")}
+        kotPrinting={kotPrinting}
+        onPrintKOT={() => handlePrintKOT(item.order)}
       />
     );
 
@@ -444,6 +491,8 @@ function KitchenCard({
   onReady,
   subOrder,
   subItems,
+  kotPrinting,
+  onPrintKOT,
 }: {
   order: Order;
   highlightedItemIds: Set<number>;
@@ -451,6 +500,8 @@ function KitchenCard({
   onReady: () => void;
   subOrder?: SubOrder;
   subItems?: Order["items"];
+  kotPrinting?: boolean;
+  onPrintKOT?: () => void;
 }) {
   // Sub-order mode: use subOrder's status/type; regular mode: use order's
   const isSubMode = !!subOrder;
@@ -631,7 +682,7 @@ function KitchenCard({
       )}
 
       {/* Action buttons */}
-      <div className="pt-1">
+      <div className="pt-1 space-y-2">
         {displayStatus === "approved" && (
           <button
             onClick={onPrepare}
@@ -652,6 +703,14 @@ function KitchenCard({
           <div className="w-full py-3 bg-green-500/10 border border-green-500/30 rounded-xl text-sm font-bold text-green-400 text-center">
             ✓ Ready — awaiting handover
           </div>
+        )}
+        {kotPrinting && onPrintKOT && (
+          <button
+            onClick={onPrintKOT}
+            className="w-full flex items-center justify-center gap-2 py-2 bg-secondary border border-border hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl text-xs font-semibold transition-colors"
+          >
+            <Printer size={13} /> Print KOT
+          </button>
         )}
       </div>
     </div>

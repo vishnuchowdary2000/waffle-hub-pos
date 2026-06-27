@@ -15,7 +15,10 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatTime, STATUS_LABELS, ORDER_TYPE_LABELS } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, CheckCircle, Banknote, Smartphone, CreditCard, Phone, ShoppingBag, UtensilsCrossed, XCircle, AlertTriangle } from "lucide-react";
+import { ArrowLeft, CheckCircle, Banknote, Smartphone, CreditCard, Phone, ShoppingBag, UtensilsCrossed, XCircle, AlertTriangle, Printer, RotateCcw } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useGetStoreSettings, getGetStoreSettingsQueryKey } from "@workspace/api-client-react";
+import { type PaperSize, printReceipt } from "@/lib/printService";
 
 const statusClass: Record<string, string> = {
   pending_payment: "status-pending_payment",
@@ -31,6 +34,10 @@ export default function Billing() {
   const [, navigate] = useLocation();
   const orderId = params ? parseInt(params.id) : 0;
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const { data: settings } = useGetStoreSettings({
+    query: { queryKey: getGetStoreSettingsQueryKey() },
+  });
 
   const { data: order, isLoading } = useGetOrder(orderId, {
     query: { enabled: !!orderId, queryKey: getGetOrderQueryKey(orderId) },
@@ -127,6 +134,52 @@ export default function Billing() {
         onSuccess: () => afterSave(),
       });
     }
+  };
+
+  const handlePrintReceipt = (action: "printed" | "reprinted") => {
+    if (!order || !existingPayment) return;
+    const cashierName = user?.displayName ?? user?.username ?? "Cashier";
+    const epDiscount = existingPayment.discountType === "percentage"
+      ? order.totalAmount * ((existingPayment.discountValue ?? 0) / 100)
+      : existingPayment.discountType === "fixed"
+      ? (existingPayment.discountValue ?? 0)
+      : 0;
+
+    printReceipt(
+      {
+        orderNumber: order.orderNumber,
+        orderType: order.orderType,
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        specialInstructions: order.notes,
+        items: order.items.map(item => ({
+          productName: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+          isAddon: item.isAddon,
+        })),
+        totalAmount: order.totalAmount,
+        cashAmount: existingPayment.cashAmount,
+        upiAmount: existingPayment.upiAmount,
+        cardAmount: existingPayment.cardAmount,
+        discountAmount: epDiscount,
+        charityAmount: existingPayment.charityAmount ?? 0,
+        balance: existingPayment.balance,
+        cashierName,
+        createdAt: order.createdAt,
+      },
+      {
+        shopName:        settings?.shopName        ?? "The Waffle Hub",
+        shopAddress:     settings?.shopAddress     ?? "",
+        shopPhone:       settings?.shopPhone       ?? "",
+        fssaiNumber:     settings?.fssaiNumber     ?? "",
+        gstNumber:       settings?.gstNumber       ?? "",
+        thankYouMessage: settings?.thankYouMessage ?? "Thank you for visiting! See you again.",
+        paperSize:       (settings?.paperSize      ?? "80mm") as PaperSize,
+      },
+      order.id,
+      action
+    );
   };
 
   return (
@@ -456,6 +509,24 @@ export default function Billing() {
             </span>
           ) : "Save Partial Payment"}
         </button>
+
+        {settings?.receiptPrinting && existingPayment && (
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={() => handlePrintReceipt("printed")}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-secondary text-foreground border border-border hover:bg-muted text-sm font-semibold transition-colors"
+            >
+              <Printer size={15} /> Print Receipt
+            </button>
+            <button
+              onClick={() => handlePrintReceipt("reprinted")}
+              title="Reprint Receipt"
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-secondary text-muted-foreground border border-border hover:text-foreground text-sm font-semibold transition-colors"
+            >
+              <RotateCcw size={14} /> Reprint
+            </button>
+          </div>
+        )}
       </div>}
     </div>
   );

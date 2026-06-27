@@ -61,43 +61,74 @@ router.get("/public/store/status", async (_req, res): Promise<void> => {
 router.get("/store/settings", requireRole("admin", "counter"), async (_req, res): Promise<void> => {
   const { settings } = await getStoreOpenStatus();
   res.json({
-    manualOverride: settings.manualOverride,
-    isOpen: settings.isOpen,
-    openTime: settings.openTime,
-    closeTime: settings.closeTime,
-    contactNumber: settings.contactNumber ?? "",
-    updatedAt: settings.updatedAt.toISOString(),
+    manualOverride:  settings.manualOverride,
+    isOpen:          settings.isOpen,
+    openTime:        settings.openTime,
+    closeTime:       settings.closeTime,
+    contactNumber:   settings.contactNumber ?? "",
+    receiptPrinting: settings.receiptPrinting,
+    kotPrinting:     settings.kotPrinting,
+    autoPrint:       settings.autoPrint,
+    paperSize:       settings.paperSize,
+    shopName:        settings.shopName,
+    shopAddress:     settings.shopAddress,
+    shopPhone:       settings.shopPhone,
+    fssaiNumber:     settings.fssaiNumber,
+    gstNumber:       settings.gstNumber,
+    thankYouMessage: settings.thankYouMessage,
+    updatedAt:       settings.updatedAt.toISOString(),
   });
 });
 
 // ── PUT /store/settings ──────────────────────────────────────────────────────
 router.put("/store/settings", requireRole("admin", "counter"), async (req, res): Promise<void> => {
-  const { manualOverride, isOpen, openTime, closeTime, contactNumber } = req.body as {
-    manualOverride?: boolean;
-    isOpen?: boolean;
-    openTime?: string;
-    closeTime?: string;
-    contactNumber?: string;
+  const body = req.body as {
+    manualOverride?: boolean; isOpen?: boolean;
+    openTime?: string; closeTime?: string; contactNumber?: string;
+    receiptPrinting?: boolean; kotPrinting?: boolean; autoPrint?: boolean;
+    paperSize?: string; shopName?: string; shopAddress?: string;
+    shopPhone?: string; fssaiNumber?: string; gstNumber?: string;
+    thankYouMessage?: string;
   };
 
   const updates: Partial<typeof storeSettingsTable.$inferInsert> = {};
-  if (typeof manualOverride === "boolean") updates.manualOverride = manualOverride;
-  if (typeof isOpen === "boolean") updates.isOpen = isOpen;
-  if (typeof openTime === "string") updates.openTime = openTime;
-  if (typeof closeTime === "string") updates.closeTime = closeTime;
-  if (typeof contactNumber === "string") updates.contactNumber = contactNumber;
+  if (typeof body.manualOverride  === "boolean") updates.manualOverride  = body.manualOverride;
+  if (typeof body.isOpen          === "boolean") updates.isOpen          = body.isOpen;
+  if (typeof body.openTime        === "string")  updates.openTime        = body.openTime;
+  if (typeof body.closeTime       === "string")  updates.closeTime       = body.closeTime;
+  if (typeof body.contactNumber   === "string")  updates.contactNumber   = body.contactNumber;
+  if (typeof body.receiptPrinting === "boolean") updates.receiptPrinting = body.receiptPrinting;
+  if (typeof body.kotPrinting     === "boolean") updates.kotPrinting     = body.kotPrinting;
+  if (typeof body.autoPrint       === "boolean") updates.autoPrint       = body.autoPrint;
+  if (typeof body.paperSize       === "string")  updates.paperSize       = body.paperSize;
+  if (typeof body.shopName        === "string")  updates.shopName        = body.shopName;
+  if (typeof body.shopAddress     === "string")  updates.shopAddress     = body.shopAddress;
+  if (typeof body.shopPhone       === "string")  updates.shopPhone       = body.shopPhone;
+  if (typeof body.fssaiNumber     === "string")  updates.fssaiNumber     = body.fssaiNumber;
+  if (typeof body.gstNumber       === "string")  updates.gstNumber       = body.gstNumber;
+  if (typeof body.thankYouMessage === "string")  updates.thankYouMessage = body.thankYouMessage;
 
   await db.insert(storeSettingsTable).values({ id: 1, ...updates })
     .onConflictDoUpdate({ target: storeSettingsTable.id, set: updates });
 
   const [updated] = await db.select().from(storeSettingsTable).where(eq(storeSettingsTable.id, 1));
   res.json({
-    manualOverride: updated.manualOverride,
-    isOpen: updated.isOpen,
-    openTime: updated.openTime,
-    closeTime: updated.closeTime,
-    contactNumber: updated.contactNumber ?? "",
-    updatedAt: updated.updatedAt.toISOString(),
+    manualOverride:  updated.manualOverride,
+    isOpen:          updated.isOpen,
+    openTime:        updated.openTime,
+    closeTime:       updated.closeTime,
+    contactNumber:   updated.contactNumber ?? "",
+    receiptPrinting: updated.receiptPrinting,
+    kotPrinting:     updated.kotPrinting,
+    autoPrint:       updated.autoPrint,
+    paperSize:       updated.paperSize,
+    shopName:        updated.shopName,
+    shopAddress:     updated.shopAddress,
+    shopPhone:       updated.shopPhone,
+    fssaiNumber:     updated.fssaiNumber,
+    gstNumber:       updated.gstNumber,
+    thankYouMessage: updated.thankYouMessage,
+    updatedAt:       updated.updatedAt.toISOString(),
   });
 });
 

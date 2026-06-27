@@ -462,6 +462,16 @@ export interface StoreSettings {
   openTime: string;
   closeTime: string;
   contactNumber?: string;
+  receiptPrinting?: boolean;
+  kotPrinting?: boolean;
+  autoPrint?: boolean;
+  paperSize?: string;
+  shopName?: string;
+  shopAddress?: string;
+  shopPhone?: string;
+  fssaiNumber?: string;
+  gstNumber?: string;
+  thankYouMessage?: string;
   updatedAt: string;
 }
 
@@ -471,6 +481,36 @@ export interface StoreSettingsInput {
   openTime?: string;
   closeTime?: string;
   contactNumber?: string;
+  receiptPrinting?: boolean;
+  kotPrinting?: boolean;
+  autoPrint?: boolean;
+  paperSize?: string;
+  shopName?: string;
+  shopAddress?: string;
+  shopPhone?: string;
+  fssaiNumber?: string;
+  gstNumber?: string;
+  thankYouMessage?: string;
+}
+
+export interface PrintHistoryItem {
+  id: number;
+  orderId: number;
+  orderNumber: string;
+  type: string;
+  action: string;
+  printedBy: string;
+  paperSize: string;
+  printedAt: string;
+}
+
+export interface PrintHistoryInput {
+  orderId: number;
+  orderNumber: string;
+  type: string;
+  action: string;
+  printedBy: string;
+  paperSize: string;
 }
 
 export interface StoreAnnouncement {
@@ -541,6 +581,10 @@ search?: string;
 export type ListExpensesParams = {
 period?: string;
 date?: string;
+};
+
+export type ListPrintHistoryParams = {
+orderId?: number;
 };
 
 export type GetDailyReportParams = {

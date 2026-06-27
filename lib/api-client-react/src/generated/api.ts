@@ -42,6 +42,7 @@ import type {
   ListOffersParams,
   ListOrderHistoryParams,
   ListOrdersParams,
+  ListPrintHistoryParams,
   ListProductsParams,
   LookupPublicCustomerParams,
   Offer,
@@ -58,6 +59,8 @@ import type {
   Payment,
   PaymentInput,
   PaymentUpdate,
+  PrintHistoryInput,
+  PrintHistoryItem,
   Product,
   ProductInput,
   ProductSalesItem,
@@ -4287,6 +4290,161 @@ export const useDeleteStoreAnnouncement = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteStoreAnnouncementMutationOptions(options));
+    }
+
+export const getListPrintHistoryUrl = (params?: ListPrintHistoryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/print/history?${stringifiedParams}` : `/api/print/history`
+}
+
+/**
+ * @summary List print history for an order
+ */
+export const listPrintHistory = async (params?: ListPrintHistoryParams, options?: RequestInit): Promise<PrintHistoryItem[]> => {
+
+  return customFetch<PrintHistoryItem[]>(getListPrintHistoryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPrintHistoryQueryKey = (params?: ListPrintHistoryParams,) => {
+    return [
+    `/api/print/history`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListPrintHistoryQueryOptions = <TData = Awaited<ReturnType<typeof listPrintHistory>>, TError = ErrorType<unknown>>(params?: ListPrintHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPrintHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPrintHistoryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPrintHistory>>> = ({ signal }) => listPrintHistory(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPrintHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPrintHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof listPrintHistory>>>
+export type ListPrintHistoryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List print history for an order
+ */
+
+export function useListPrintHistory<TData = Awaited<ReturnType<typeof listPrintHistory>>, TError = ErrorType<unknown>>(
+ params?: ListPrintHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPrintHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPrintHistoryQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getLogPrintUrl = () => {
+
+
+
+
+  return `/api/print/history`
+}
+
+/**
+ * @summary Log a print action (receipt or KOT)
+ */
+export const logPrint = async (printHistoryInput: PrintHistoryInput, options?: RequestInit): Promise<PrintHistoryItem> => {
+
+  return customFetch<PrintHistoryItem>(getLogPrintUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      printHistoryInput,)
+  }
+);}
+
+
+
+
+export const getLogPrintMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logPrint>>, TError,{data: BodyType<PrintHistoryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof logPrint>>, TError,{data: BodyType<PrintHistoryInput>}, TContext> => {
+
+const mutationKey = ['logPrint'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logPrint>>, {data: BodyType<PrintHistoryInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  logPrint(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LogPrintMutationResult = NonNullable<Awaited<ReturnType<typeof logPrint>>>
+    export type LogPrintMutationBody = BodyType<PrintHistoryInput>
+    export type LogPrintMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Log a print action (receipt or KOT)
+ */
+export const useLogPrint = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logPrint>>, TError,{data: BodyType<PrintHistoryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof logPrint>>,
+        TError,
+        {data: BodyType<PrintHistoryInput>},
+        TContext
+      > => {
+      return useMutation(getLogPrintMutationOptions(options));
     }
 
 export const getListProductionCountsUrl = () => {

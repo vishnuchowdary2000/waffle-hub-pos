@@ -1,0 +1,220 @@
+FUTURE PRINTING SYSTEM
+
+IMPORTANT
+
+Do not integrate any printer hardware yet.
+
+Prepare the application so printing can be enabled later without changing code.
+
+---
+
+ADMIN SETTINGS
+
+Create a Printing section.
+
+Settings:
+
+1. Receipt Printing
+
+   * ON
+   * OFF
+
+Default:
+OFF
+
+2. KOT Printing
+
+   * ON
+   * OFF
+
+Default:
+OFF
+
+3. Auto Print
+
+   * ON
+   * OFF
+
+Default:
+OFF
+
+---
+
+PAPER SIZE
+
+Support multiple paper sizes.
+
+Options:
+
+* 58mm Thermal
+* 80mm Thermal
+* A4
+* Custom Width (future)
+
+Admin should be able to change the paper size without modifying code.
+
+---
+
+RECEIPT TEMPLATE
+
+Create a printer-friendly receipt template.
+
+Include:
+
+Shop Name
+
+Logo (future)
+
+GST Number (future)
+
+FSSAI Number
+
+Address
+
+Phone Number
+
+Order Number
+
+Customer Name
+
+Mobile Number
+
+Table Number (if applicable)
+
+Order Type
+
+Items
+
+Quantity
+
+Price
+
+Subtotal
+
+Discount
+
+Offer Discount
+
+Charity
+
+Tax (future)
+
+Total
+
+Amount Paid
+
+Pending Amount
+
+Payment Method
+
+Cashier Name
+
+Date & Time
+
+Thank You Message
+
+---
+
+KOT TEMPLATE
+
+Create a Kitchen Order Ticket template.
+
+Include:
+
+Order Number
+
+Sub Order Number (A/B if applicable)
+
+Kitchen
+
+Table Number
+
+Customer Name
+
+Order Type
+
+Items
+
+Quantity
+
+Special Instructions
+
+Time
+
+---
+
+PRINT BUTTONS
+
+When Printing is OFF
+
+Hide:
+
+* Print Receipt
+* Reprint Receipt
+* Print KOT
+
+When Printing is ON
+
+Show:
+
+* Print Receipt
+* Reprint Receipt
+* Print KOT
+
+---
+
+FUTURE PRINTER SUPPORT
+
+Design the system so future integrations can support:
+
+* USB Thermal Printer
+* Bluetooth Thermal Printer
+* Network Printer
+* Browser Printing
+* ESC/POS Printers
+
+without redesigning the application.
+
+---
+
+PRINT HISTORY
+
+Store:
+
+Printed
+
+Reprinted
+
+Print Time
+
+Printed By
+
+---
+
+SELF TEST
+
+Verify:
+
+1. Printing OFF
+
+Print buttons are hidden.
+
+2. Printing ON
+
+Print buttons appear.
+
+3. Switching paper size
+
+Receipt preview changes correctly.
+
+4. Receipt layout works for:
+
+58mm
+
+80mm
+
+A4
+
+5. No printer hardware is required for testing.
+
+Do not mark complete until all tests pass.

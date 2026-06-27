@@ -18,6 +18,8 @@ tags:
   - name: dashboard
   - name: users
   - name: public
+  - name: store
+  - name: print
 
 paths:
   /healthz:
@@ -1153,6 +1155,44 @@ paths:
         "204":
           description: Deleted
 
+  # ── Print History ────────────────────────────────────────────────────────────
+  /print/history:
+    get:
+      operationId: listPrintHistory
+      tags: [print]
+      summary: List print history for an order
+      parameters:
+        - name: orderId
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PrintHistoryItem"
+    post:
+      operationId: logPrint
+      tags: [print]
+      summary: Log a print action (receipt or KOT)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PrintHistoryInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrintHistoryItem"
+
   /production:
     get:
       operationId: listProductionCounts
@@ -1820,21 +1860,65 @@ components:
       type: object
       required: [manualOverride, isOpen, openTime, closeTime, updatedAt]
       properties:
-        manualOverride:  { type: boolean }
-        isOpen:          { type: boolean }
-        openTime:        { type: string }
-        closeTime:       { type: string }
-        contactNumber:   { type: string }
-        updatedAt:       { type: string }
+        manualOverride:    { type: boolean }
+        isOpen:            { type: boolean }
+        openTime:          { type: string }
+        closeTime:         { type: string }
+        contactNumber:     { type: string }
+        receiptPrinting:   { type: boolean }
+        kotPrinting:       { type: boolean }
+        autoPrint:         { type: boolean }
+        paperSize:         { type: string }
+        shopName:          { type: string }
+        shopAddress:       { type: string }
+        shopPhone:         { type: string }
+        fssaiNumber:       { type: string }
+        gstNumber:         { type: string }
+        thankYouMessage:   { type: string }
+        updatedAt:         { type: string }
 
     StoreSettingsInput:
       type: object
       properties:
-        manualOverride:  { type: boolean }
-        isOpen:          { type: boolean }
-        openTime:        { type: string }
-        closeTime:       { type: string }
-        contactNumber:   { type: string }
+        manualOverride:    { type: boolean }
+        isOpen:            { type: boolean }
+        openTime:          { type: string }
+        closeTime:         { type: string }
+        contactNumber:     { type: string }
+        receiptPrinting:   { type: boolean }
+        kotPrinting:       { type: boolean }
+        autoPrint:         { type: boolean }
+        paperSize:         { type: string }
+        shopName:          { type: string }
+        shopAddress:       { type: string }
+        shopPhone:         { type: string }
+        fssaiNumber:       { type: string }
+        gstNumber:         { type: string }
+        thankYouMessage:   { type: string }
+
+    PrintHistoryItem:
+      type: object
+      required: [id, orderId, orderNumber, type, action, printedBy, paperSize, printedAt]
+      properties:
+        id:          { type: integer }
+        orderId:     { type: integer }
+        orderNumber: { type: string }
+        type:        { type: string }
+        action:      { type: string }
+        printedBy:   { type: string }
+        paperSize:   { type: string }
+        printedAt:   { type: string }
+
+    PrintHistoryInput:
+      type: object
+      required: [orderId, orderNumber, type, action, printedBy, paperSize]
+      properties:
+        orderId:     { type: integer }
+        orderNumber: { type: string }
+        type:        { type: string }
+        action:      { type: string }
+        printedBy:   { type: string }
+        paperSize:   { type: string }
 
     StoreAnnouncement:
       type: object

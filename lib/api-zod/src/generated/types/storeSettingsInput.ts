@@ -12,4 +12,14 @@ export interface StoreSettingsInput {
   openTime?: string;
   closeTime?: string;
   contactNumber?: string;
+  receiptPrinting?: boolean;
+  kotPrinting?: boolean;
+  autoPrint?: boolean;
+  paperSize?: string;
+  shopName?: string;
+  shopAddress?: string;
+  shopPhone?: string;
+  fssaiNumber?: string;
+  gstNumber?: string;
+  thankYouMessage?: string;
 }
