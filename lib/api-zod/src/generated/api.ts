@@ -1528,7 +1528,9 @@ export const GetDailyReportResponse = zod.object({
 
 
 export const GetProductReportQueryParams = zod.object({
-  "period": zod.coerce.string().optional()
+  "period": zod.coerce.string().optional(),
+  "from": zod.coerce.string().optional(),
+  "to": zod.coerce.string().optional()
 })
 
 export const GetProductReportResponseItem = zod.object({
@@ -1537,5 +1539,113 @@ export const GetProductReportResponseItem = zod.object({
   "totalRevenue": zod.number()
 })
 export const GetProductReportResponse = zod.array(GetProductReportResponseItem)
+
+
+export const GetReportRangeQueryParams = zod.object({
+  "from": zod.coerce.string(),
+  "to": zod.coerce.string()
+})
+
+export const GetReportRangeResponse = zod.object({
+  "from": zod.string(),
+  "to": zod.string(),
+  "totalOrders": zod.number(),
+  "completedOrders": zod.number(),
+  "pendingOrders": zod.number(),
+  "cancelledOrders": zod.number(),
+  "totalRevenue": zod.number(),
+  "totalExpenses": zod.number(),
+  "netRevenue": zod.number(),
+  "avgOrderValue": zod.number(),
+  "cashRevenue": zod.number(),
+  "upiRevenue": zod.number(),
+  "cardRevenue": zod.number(),
+  "totalDiscount": zod.number(),
+  "totalCharity": zod.number(),
+  "dineInOrders": zod.number(),
+  "takeawayOrders": zod.number(),
+  "mixedOrders": zod.number(),
+  "categories": zod.array(zod.object({
+  "categoryName": zod.string(),
+  "orders": zod.number(),
+  "quantity": zod.number(),
+  "revenue": zod.number()
+})),
+  "topProducts": zod.array(zod.object({
+  "productName": zod.string(),
+  "totalQuantity": zod.number(),
+  "totalRevenue": zod.number()
+}))
+})
+
+
+export const ListOrderHistoryQueryParams = zod.object({
+  "page": zod.coerce.number().optional(),
+  "limit": zod.coerce.number().optional(),
+  "search": zod.coerce.string().optional()
+})
+
+export const ListOrderHistoryResponse = zod.object({
+  "orders": zod.array(zod.object({
+  "id": zod.number(),
+  "orderNumber": zod.string(),
+  "customerId": zod.number().nullish(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string().nullish(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "notes": zod.string().nullish(),
+  "priority": zod.boolean().optional(),
+  "totalAmount": zod.number(),
+  "subtotalAmount": zod.number().optional(),
+  "discountAmount": zod.number().optional(),
+  "offerId": zod.number().nullish(),
+  "source": zod.string().optional(),
+  "createdAt": zod.string(),
+  "readyTime": zod.string(),
+  "updatedAt": zod.string().optional(),
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "productId": zod.number().nullish(),
+  "productName": zod.string(),
+  "price": zod.number(),
+  "quantity": zod.number(),
+  "itemOrderType": zod.string(),
+  "notes": zod.string().nullish(),
+  "isAddon": zod.boolean().optional()
+})),
+  "payment": zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "totalAmount": zod.number(),
+  "cashAmount": zod.number(),
+  "upiAmount": zod.number(),
+  "cardAmount": zod.number(),
+  "discountType": zod.string().nullable(),
+  "discountValue": zod.number(),
+  "discountAmount": zod.number(),
+  "charityAmount": zod.number(),
+  "finalAmount": zod.number(),
+  "totalPaid": zod.number(),
+  "balance": zod.number(),
+  "status": zod.string(),
+  "createdAt": zod.string()
+}).optional(),
+  "subOrders": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "subCode": zod.string(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})).optional()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "pages": zod.number(),
+  "limit": zod.number()
+})
 
 

@@ -1219,6 +1219,14 @@ paths:
           in: query
           schema:
             type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: OK
@@ -1228,6 +1236,54 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ProductSalesItem"
+
+  /reports/range:
+    get:
+      operationId: getReportRange
+      tags: [reports]
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportSummary"
+
+  /orders/history:
+    get:
+      operationId: listOrderHistory
+      tags: [orders]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderHistoryPage"
 
 components:
   schemas:
@@ -1607,6 +1663,59 @@ components:
         productName:   { type: string }
         totalQuantity: { type: integer }
         totalRevenue:  { type: number }
+
+    CategoryPerformanceItem:
+      type: object
+      required: [categoryName, orders, quantity, revenue]
+      properties:
+        categoryName: { type: string }
+        orders:       { type: integer }
+        quantity:     { type: integer }
+        revenue:      { type: number }
+
+    ReportSummary:
+      type: object
+      required: [from, to, totalOrders, completedOrders, pendingOrders, cancelledOrders, totalRevenue, totalExpenses, netRevenue, avgOrderValue, cashRevenue, upiRevenue, cardRevenue, totalDiscount, totalCharity, dineInOrders, takeawayOrders, mixedOrders, categories, topProducts]
+      properties:
+        from:            { type: string }
+        to:              { type: string }
+        totalOrders:     { type: integer }
+        completedOrders: { type: integer }
+        pendingOrders:   { type: integer }
+        cancelledOrders: { type: integer }
+        totalRevenue:    { type: number }
+        totalExpenses:   { type: number }
+        netRevenue:      { type: number }
+        avgOrderValue:   { type: number }
+        cashRevenue:     { type: number }
+        upiRevenue:      { type: number }
+        cardRevenue:     { type: number }
+        totalDiscount:   { type: number }
+        totalCharity:    { type: number }
+        dineInOrders:    { type: integer }
+        takeawayOrders:  { type: integer }
+        mixedOrders:     { type: integer }
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryPerformanceItem"
+        topProducts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductSalesItem"
+
+    OrderHistoryPage:
+      type: object
+      required: [orders, total, page, pages, limit]
+      properties:
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+        total: { type: integer }
+        page:  { type: integer }
+        pages: { type: integer }
+        limit: { type: integer }
 
     # ── User ──────────────────────────────────────────────────────────────────
     User:

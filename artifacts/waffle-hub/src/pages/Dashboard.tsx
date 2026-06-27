@@ -1,7 +1,7 @@
 import {
   useGetDashboard, useListOrders, useUpdateOrderStatus, useAddOrderItem, useListProducts,
-  useGetPublicStoreStatus, useUpdateStoreSettings,
-  getGetDashboardQueryKey, getListOrdersQueryKey, getGetPublicStoreStatusQueryKey,
+  useGetPublicStoreStatus, useUpdateStoreSettings, useListOrderHistory,
+  getGetDashboardQueryKey, getListOrdersQueryKey, getGetPublicStoreStatusQueryKey, getListOrderHistoryQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatTime, STATUS_LABELS, ORDER_TYPE_LABELS } from "@/lib/utils";
@@ -10,9 +10,9 @@ import { Link } from "wouter";
 import {
   RefreshCw, TrendingUp, ChefHat, Clock, CheckCircle,
   Search, Trash2, X, AlertTriangle, Plus, Minus, Phone, ShoppingBag,
-  ToggleLeft, ToggleRight,
+  ToggleLeft, ToggleRight, ChevronLeft, ChevronRight,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const statusClass: Record<string, string> = {
   pending_payment: "status-pending_payment",
@@ -62,6 +62,9 @@ export default function Dashboard() {
   });
   const updateSettings = useUpdateStoreSettings();
   const [search, setSearch] = useState("");
+  const [page, setPage]     = useState(1);
+
+  useEffect(() => { setPage(1); }, [search]);
 
   const toggleStore = () => {
     if (!storeStatus) return;
@@ -73,9 +76,9 @@ export default function Dashboard() {
   const [confirm, setConfirm] = useState<ConfirmState>(null);
   const [addItems, setAddItems] = useState<AddItemsState>(null);
 
-  const { data: searchResults } = useListOrders(
-    { search },
-    { query: { enabled: search.length > 0, refetchInterval: 3000, queryKey: getListOrdersQueryKey({ search }) } }
+  const { data: historyData } = useListOrderHistory(
+    { page, limit: 25, search: search || undefined },
+    { query: { refetchInterval: 3000, queryKey: getListOrderHistoryQueryKey({ page, limit: 25, search: search || undefined }) } }
   );
 
   const updateStatus = useUpdateOrderStatus();
@@ -96,7 +99,9 @@ export default function Dashboard() {
   }
 
   const summary = data;
-  const displayOrders = search.length > 0 ? (searchResults ?? []) : (summary?.recentOrders ?? []);
+  const displayOrders = historyData?.orders ?? [];
+  const totalPages = historyData?.pages ?? 1;
+  const totalOrders = historyData?.total ?? 0;
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -179,20 +184,27 @@ export default function Dashboard() {
 
       {/* Orders table */}
       <div>
-        <div className="flex items-center gap-3 mb-3">
-          <h2 className="text-lg font-semibold flex-1">Recent Orders</h2>
+        <div className="flex items-center gap-3 mb-3 flex-wrap">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold">All Orders</h2>
+            {totalOrders > 0 && (
+              <p className="text-xs text-muted-foreground">{totalOrders} total</p>
+            )}
+          </div>
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input type="text" placeholder="Search orders..." value={search} onChange={e => setSearch(e.target.value)}
-              className="bg-secondary border border-border rounded-lg pl-8 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring w-48" />
+            <input type="text" placeholder="Search by name, phone, order #…" value={search} onChange={e => setSearch(e.target.value)}
+              className="bg-secondary border border-border rounded-lg pl-8 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring w-60" />
           </div>
         </div>
 
         <div className="space-y-2">
           {displayOrders.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">No orders yet today</div>
+            <div className="text-center py-8 text-muted-foreground">
+              {search ? "No orders match your search" : "No orders yet"}
+            </div>
           )}
-          {displayOrders.slice(0, 25).map(order => {
+          {displayOrders.map(order => {
             const isActive = ACTIVE_STATUSES.has(order.status);
             const isUnpaid = !order.payment;
             const isPartial = order.payment?.status === "partial";
@@ -256,6 +268,29 @@ export default function Dashboard() {
             );
           })}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-3 mt-4 pt-4 border-t border-border">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-secondary text-sm font-medium text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={16} /> Prev
+            </button>
+            <span className="text-sm text-muted-foreground">
+              Page <span className="font-semibold text-foreground">{page}</span> of <span className="font-semibold text-foreground">{totalPages}</span>
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-secondary text-sm font-medium text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Cancel modal */}

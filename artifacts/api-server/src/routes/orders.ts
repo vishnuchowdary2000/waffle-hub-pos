@@ -171,6 +171,40 @@ router.get("/orders", async (req, res): Promise<void> => {
   res.json(result.filter(Boolean));
 });
 
+// Paginated order history (for Dashboard all-orders view)
+router.get("/orders/history", async (req, res): Promise<void> => {
+  const page  = Math.max(1, parseInt(String(req.query.page  ?? "1"),  10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? "25"), 10) || 25));
+  const search = String(req.query.search ?? "").trim();
+
+  const conditions: ReturnType<typeof eq>[] = [];
+  if (search) {
+    const s = `%${search}%`;
+    conditions.push(or(
+      ilike(ordersTable.customerName,  s),
+      ilike(ordersTable.customerPhone, s),
+      ilike(ordersTable.orderNumber,   s),
+    )!);
+  }
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [countResult, rows] = await Promise.all([
+    db.select({ count: sql<number>`count(*)::int` }).from(ordersTable).where(where),
+    db.select({ id: ordersTable.id }).from(ordersTable)
+      .where(where)
+      .orderBy(sql`${ordersTable.createdAt} DESC`)
+      .limit(limit)
+      .offset((page - 1) * limit),
+  ]);
+
+  const total = Number(countResult[0]?.count ?? 0);
+  const pages = Math.max(1, Math.ceil(total / limit));
+
+  const orders = await Promise.all(rows.map(r => getFullOrder(r.id)));
+  res.json({ orders: orders.filter(Boolean), total, page, pages, limit });
+});
+
 // Create order
 router.post("/orders", async (req, res): Promise<void> => {
   const parsed = CreateOrderBody.safeParse(req.body);

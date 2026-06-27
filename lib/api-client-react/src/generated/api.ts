@@ -35,16 +35,19 @@ import type {
   ExpenseUpdate,
   GetDailyReportParams,
   GetProductReportParams,
+  GetReportRangeParams,
   HealthStatus,
   ListCustomersParams,
   ListExpensesParams,
   ListOffersParams,
+  ListOrderHistoryParams,
   ListOrdersParams,
   ListProductsParams,
   LookupPublicCustomerParams,
   Offer,
   OfferInput,
   Order,
+  OrderHistoryPage,
   OrderInput,
   OrderItem,
   OrderItemInput,
@@ -65,6 +68,7 @@ import type {
   PublicMenuCategory,
   PublicStats,
   ReplaceOrderItemsInput,
+  ReportSummary,
   StoreAnnouncement,
   StoreAnnouncementInput,
   StoreSettings,
@@ -4578,6 +4582,162 @@ export function useGetProductReport<TData = Awaited<ReturnType<typeof getProduct
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetProductReportQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetReportRangeUrl = (params: GetReportRangeParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/reports/range?${stringifiedParams}` : `/api/reports/range`
+}
+
+export const getReportRange = async (params: GetReportRangeParams, options?: RequestInit): Promise<ReportSummary> => {
+
+  return customFetch<ReportSummary>(getGetReportRangeUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetReportRangeQueryKey = (params?: GetReportRangeParams,) => {
+    return [
+    `/api/reports/range`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetReportRangeQueryOptions = <TData = Awaited<ReturnType<typeof getReportRange>>, TError = ErrorType<unknown>>(params: GetReportRangeParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportRange>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetReportRangeQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getReportRange>>> = ({ signal }) => getReportRange(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getReportRange>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetReportRangeQueryResult = NonNullable<Awaited<ReturnType<typeof getReportRange>>>
+export type GetReportRangeQueryError = ErrorType<unknown>
+
+
+
+export function useGetReportRange<TData = Awaited<ReturnType<typeof getReportRange>>, TError = ErrorType<unknown>>(
+ params: GetReportRangeParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportRange>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetReportRangeQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListOrderHistoryUrl = (params?: ListOrderHistoryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/orders/history?${stringifiedParams}` : `/api/orders/history`
+}
+
+export const listOrderHistory = async (params?: ListOrderHistoryParams, options?: RequestInit): Promise<OrderHistoryPage> => {
+
+  return customFetch<OrderHistoryPage>(getListOrderHistoryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOrderHistoryQueryKey = (params?: ListOrderHistoryParams,) => {
+    return [
+    `/api/orders/history`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListOrderHistoryQueryOptions = <TData = Awaited<ReturnType<typeof listOrderHistory>>, TError = ErrorType<unknown>>(params?: ListOrderHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOrderHistoryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOrderHistory>>> = ({ signal }) => listOrderHistory(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOrderHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListOrderHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof listOrderHistory>>>
+export type ListOrderHistoryQueryError = ErrorType<unknown>
+
+
+
+export function useListOrderHistory<TData = Awaited<ReturnType<typeof listOrderHistory>>, TError = ErrorType<unknown>>(
+ params?: ListOrderHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOrderHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListOrderHistoryQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

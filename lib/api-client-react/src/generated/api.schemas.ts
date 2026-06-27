@@ -337,6 +337,44 @@ export interface ProductSalesItem {
   totalRevenue: number;
 }
 
+export interface CategoryPerformanceItem {
+  categoryName: string;
+  orders: number;
+  quantity: number;
+  revenue: number;
+}
+
+export interface ReportSummary {
+  from: string;
+  to: string;
+  totalOrders: number;
+  completedOrders: number;
+  pendingOrders: number;
+  cancelledOrders: number;
+  totalRevenue: number;
+  totalExpenses: number;
+  netRevenue: number;
+  avgOrderValue: number;
+  cashRevenue: number;
+  upiRevenue: number;
+  cardRevenue: number;
+  totalDiscount: number;
+  totalCharity: number;
+  dineInOrders: number;
+  takeawayOrders: number;
+  mixedOrders: number;
+  categories: CategoryPerformanceItem[];
+  topProducts: ProductSalesItem[];
+}
+
+export interface OrderHistoryPage {
+  orders: Order[];
+  total: number;
+  page: number;
+  pages: number;
+  limit: number;
+}
+
 export interface User {
   id: number;
   username: string;
@@ -511,5 +549,18 @@ date?: string;
 
 export type GetProductReportParams = {
 period?: string;
+from?: string;
+to?: string;
+};
+
+export type GetReportRangeParams = {
+from: string;
+to: string;
+};
+
+export type ListOrderHistoryParams = {
+page?: number;
+limit?: number;
+search?: string;
 };
 

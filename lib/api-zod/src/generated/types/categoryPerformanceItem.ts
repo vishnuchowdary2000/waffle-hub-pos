@@ -6,8 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetProductReportParams = {
-period?: string;
-from?: string;
-to?: string;
-};
+export interface CategoryPerformanceItem {
+  categoryName: string;
+  orders: number;
+  quantity: number;
+  revenue: number;
+}
