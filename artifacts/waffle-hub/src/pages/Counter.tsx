@@ -35,6 +35,14 @@ type PlacedOrder = {
   items: { productName: string; quantity: number; price: number; itemOrderType: string }[];
 };
 
+type NotifOrder = {
+  id: number;
+  orderNumber: string;
+  customerName: string;
+  totalAmount: number;
+  items: { productName: string; quantity: number }[];
+};
+
 type Customer = {
   id: number;
   name: string;
@@ -138,7 +146,8 @@ export default function Counter() {
     { query: { enabled: !!selectedCustomer?.id, queryKey: getListOrdersQueryKey({ customerId: selectedCustomer?.id ?? undefined }) } }
   );
 
-  // ── QR Order Sound Notifications ────────────────────────────────────────
+  // ── QR Order Notifications ────────────────────────────────────────────────
+  const [notifOrders, setNotifOrders] = useState<NotifOrder[]>([]);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
     try { return localStorage.getItem("wh_notif_sound") !== "off"; } catch { return true; }
   });
@@ -155,11 +164,23 @@ export default function Counter() {
   useEffect(() => {
     const newOnes = qrOrders.filter(o => !seenIdsRef.current.has(o.id));
     if (newOnes.length > 0) {
+      setNotifOrders(prev => [
+        ...newOnes.map(o => ({
+          id: o.id,
+          orderNumber: o.orderNumber,
+          customerName: o.customerName,
+          totalAmount: o.totalAmount,
+          items: o.items.map(i => ({ productName: i.productName, quantity: i.quantity })),
+        })),
+        ...prev,
+      ]);
       if (initializedRef.current && soundEnabledRef.current) playChime();
       newOnes.forEach(o => seenIdsRef.current.add(o.id));
     }
     if (!initializedRef.current) initializedRef.current = true;
   }, [qrOrders]);
+
+  const dismissNotif = (id: number) => setNotifOrders(prev => prev.filter(o => o.id !== id));
 
   const toggleSound = () => setSoundEnabled(prev => {
     const next = !prev;
@@ -321,6 +342,43 @@ export default function Counter() {
               </button>
             </div>
           </div>
+
+          {/* QR Order Notification Cards */}
+          {notifOrders.map(order => (
+            <div key={order.id} className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <QrCode size={14} className="text-amber-400 shrink-0" />
+                  <span className="text-sm font-semibold text-amber-300 truncate">
+                    #{order.orderNumber} · {order.customerName || "Guest"}
+                  </span>
+                </div>
+                <span className="text-sm font-bold text-amber-400 shrink-0">{formatCurrency(order.totalAmount)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground line-clamp-2">
+                {order.items.map(i => `${i.productName} ×${i.quantity}`).join(", ")}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    await updateStatus.mutateAsync({ id: order.id, data: { status: "approved" } });
+                    dismissNotif(order.id);
+                    qc.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+                    qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+                  }}
+                  className="flex-1 bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold py-1.5 rounded-lg transition-colors"
+                >
+                  Accept & Send to Kitchen
+                </button>
+                <button
+                  onClick={() => dismissNotif(order.id)}
+                  className="px-3 py-1.5 border border-border bg-secondary hover:bg-secondary/80 text-muted-foreground text-xs rounded-lg transition-colors"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            </div>
+          ))}
 
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
