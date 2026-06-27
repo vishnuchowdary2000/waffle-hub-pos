@@ -13,6 +13,7 @@ import {
   Plus, Minus, Trash2, ShoppingCart, Search,
   Banknote, Smartphone, CreditCard, Heart,
   CheckCircle, X, ShoppingBag, UtensilsCrossed, UserRound, Clock, Tag,
+  Bell, BellOff, QrCode,
 } from "lucide-react";
 
 type ItemOrderType = "dine_in" | "takeaway";
@@ -43,6 +44,26 @@ type Customer = {
   favoriteItems?: string | null;
   lastOrderDate?: string | null;
 };
+
+function playChime() {
+  try {
+    const ctx = new AudioContext();
+    const gain = ctx.createGain();
+    gain.connect(ctx.destination);
+    [880, 1100, 1320].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      osc.connect(gain);
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.15;
+      gain.gain.setValueAtTime(0.25, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      osc.start(t);
+      osc.stop(t + 0.35);
+      if (i === 2) osc.onended = () => ctx.close();
+    });
+  } catch { /* browser may block AudioContext without user interaction */ }
+}
 
 const ORDER_TYPES = ["dine_in", "takeaway", "delivery"] as const;
 const ORDER_TYPE_LABELS: Record<string, string> = { dine_in: "Dine In", takeaway: "Takeaway", delivery: "Delivery" };
@@ -116,6 +137,35 @@ export default function Counter() {
     { customerId: selectedCustomer?.id ?? undefined },
     { query: { enabled: !!selectedCustomer?.id, queryKey: getListOrdersQueryKey({ customerId: selectedCustomer?.id ?? undefined }) } }
   );
+
+  // ── QR Order Sound Notifications ────────────────────────────────────────
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    try { return localStorage.getItem("wh_notif_sound") !== "off"; } catch { return true; }
+  });
+  const seenIdsRef = useRef<Set<number>>(new Set());
+  const initializedRef = useRef(false);
+  const soundEnabledRef = useRef(soundEnabled);
+  soundEnabledRef.current = soundEnabled;
+
+  const { data: qrOrders = [] } = useListOrders(
+    { source: "customer", status: "pending_payment" } as Parameters<typeof useListOrders>[0],
+    { query: { refetchInterval: 3000, queryKey: getListOrdersQueryKey({ source: "customer", status: "pending_payment" }) } }
+  );
+
+  useEffect(() => {
+    const newOnes = qrOrders.filter(o => !seenIdsRef.current.has(o.id));
+    if (newOnes.length > 0) {
+      if (initializedRef.current && soundEnabledRef.current) playChime();
+      newOnes.forEach(o => seenIdsRef.current.add(o.id));
+    }
+    if (!initializedRef.current) initializedRef.current = true;
+  }, [qrOrders]);
+
+  const toggleSound = () => setSoundEnabled(prev => {
+    const next = !prev;
+    try { localStorage.setItem("wh_notif_sound", next ? "on" : "off"); } catch {}
+    return next;
+  });
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -251,6 +301,25 @@ export default function Counter() {
         <div className="px-4 pt-4 pb-2 space-y-3 shrink-0">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-bold text-foreground">Order Taking</h1>
+            <div className="flex items-center gap-2">
+              {qrOrders.length > 0 && (
+                <span className="flex items-center gap-1 bg-amber-500/20 border border-amber-500/40 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
+                  <QrCode size={10} /> {qrOrders.length} QR
+                </span>
+              )}
+              <button
+                onClick={toggleSound}
+                title={soundEnabled ? "Sound ON — click to mute" : "Sound OFF — click to enable"}
+                className={cn(
+                  "p-1.5 rounded-lg border transition-colors",
+                  soundEnabled
+                    ? "text-amber-400 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20"
+                    : "text-muted-foreground border-border bg-secondary hover:border-border"
+                )}
+              >
+                {soundEnabled ? <Bell size={14} /> : <BellOff size={14} />}
+              </button>
+            </div>
           </div>
 
           <div className="relative">
