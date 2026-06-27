@@ -1,4 +1,4 @@
-export type PaperSize = "58mm" | "80mm" | "A4";
+export type PaperSize = "58mm" | "80mm" | "A4" | "custom";
 export type PrintType = "receipt" | "kot";
 
 export interface PrintShopInfo {
@@ -9,6 +9,10 @@ export interface PrintShopInfo {
   gstNumber: string;
   thankYouMessage: string;
   paperSize: PaperSize;
+  customPaperWidth?: number | null;
+  customPaperHeight?: number | null;
+  receiptPrinterName?: string;
+  kotPrinterName?: string;
 }
 
 export interface ReceiptItem {
@@ -74,12 +78,25 @@ function formatDateTime(iso: string): string {
   });
 }
 
-function getPaperCSS(size: PaperSize): string {
-  const widths = { "58mm": "54mm", "80mm": "76mm", "A4": "190mm" };
-  const fontSz = { "58mm": "9px",  "80mm": "11px", "A4": "12px" };
-  const w = widths[size];
-  const f = fontSz[size];
-  const pageSize = size === "A4" ? "A4" : `${size} auto`;
+function getPaperCSS(size: PaperSize, customWidth?: number | null, customHeight?: number | null): string {
+  let w: string;
+  let f: string;
+  let pageSize: string;
+
+  if (size === "custom") {
+    const wMm = customWidth ?? 80;
+    const hMm = customHeight ?? null;
+    w = `${wMm - 4}mm`;
+    f = wMm <= 60 ? "9px" : wMm <= 85 ? "11px" : "12px";
+    pageSize = hMm ? `${wMm}mm ${hMm}mm` : `${wMm}mm auto`;
+  } else {
+    const widths = { "58mm": "54mm", "80mm": "76mm", "A4": "190mm" };
+    const fontSz = { "58mm": "9px",  "80mm": "11px", "A4": "12px" };
+    w = widths[size];
+    f = fontSz[size];
+    pageSize = size === "A4" ? "A4" : `${size} auto`;
+  }
+
   return `
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -250,18 +267,25 @@ export function generateKOTHTML(kot: KOTData, shop: PrintShopInfo): string {
 
 // ── Browser Print Trigger ─────────────────────────────────────────────────────
 
-export function triggerBrowserPrint(html: string, paperSize: PaperSize): void {
+export function triggerBrowserPrint(
+  html: string,
+  paperSize: PaperSize,
+  windowTitle?: string,
+  customPaperWidth?: number | null,
+  customPaperHeight?: number | null,
+): void {
   const win = window.open("", "_blank", "width=600,height=700,scrollbars=yes");
   if (!win) {
     alert("Please allow pop-ups to enable printing.");
     return;
   }
+  const title = windowTitle ?? "Print";
   win.document.write(`<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Print</title>
-  <style>${getPaperCSS(paperSize)}</style>
+  <title>${title}</title>
+  <style>${getPaperCSS(paperSize, customPaperWidth, customPaperHeight)}</style>
 </head>
 <body>${html}</body>
 </html>`);
@@ -277,7 +301,7 @@ export function triggerBrowserPrint(html: string, paperSize: PaperSize): void {
 export async function logPrintHistory(data: {
   orderId: number; orderNumber: string;
   type: PrintType; action: "printed" | "reprinted";
-  printedBy: string; paperSize: string;
+  printedBy: string; paperSize: string; printerName: string;
 }): Promise<void> {
   try {
     await fetch("/api/print/history", {
@@ -298,15 +322,20 @@ export function printReceipt(
   orderId: number,
   action: "printed" | "reprinted",
 ): void {
+  const printerName = shop.receiptPrinterName ?? "";
+  const windowTitle = printerName ? `Receipt — ${printerName}` : "Receipt";
   const html = generateReceiptHTML(receipt, shop);
-  triggerBrowserPrint(html, shop.paperSize);
+  triggerBrowserPrint(html, shop.paperSize, windowTitle, shop.customPaperWidth, shop.customPaperHeight);
   void logPrintHistory({
     orderId,
     orderNumber: receipt.orderNumber,
     type: "receipt",
     action,
     printedBy: receipt.cashierName,
-    paperSize: shop.paperSize,
+    paperSize: shop.paperSize === "custom"
+      ? `custom-${shop.customPaperWidth ?? 80}x${shop.customPaperHeight ?? "auto"}mm`
+      : shop.paperSize,
+    printerName,
   });
 }
 
@@ -315,15 +344,21 @@ export function printKOT(
   shop: PrintShopInfo,
   orderId: number,
   printedBy: string,
+  action: "printed" | "reprinted" = "printed",
 ): void {
+  const printerName = shop.kotPrinterName ?? "";
+  const windowTitle = printerName ? `KOT — ${printerName}` : "KOT";
   const html = generateKOTHTML(kot, shop);
-  triggerBrowserPrint(html, shop.paperSize);
+  triggerBrowserPrint(html, shop.paperSize, windowTitle, shop.customPaperWidth, shop.customPaperHeight);
   void logPrintHistory({
     orderId,
     orderNumber: kot.orderNumber,
     type: "kot",
-    action: "printed",
+    action,
     printedBy,
-    paperSize: shop.paperSize,
+    paperSize: shop.paperSize === "custom"
+      ? `custom-${shop.customPaperWidth ?? 80}x${shop.customPaperHeight ?? "auto"}mm`
+      : shop.paperSize,
+    printerName,
   });
 }

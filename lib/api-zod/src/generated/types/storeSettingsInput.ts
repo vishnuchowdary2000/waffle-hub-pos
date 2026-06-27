@@ -15,7 +15,12 @@ export interface StoreSettingsInput {
   receiptPrinting?: boolean;
   kotPrinting?: boolean;
   autoPrint?: boolean;
+  autoPrintReceipt?: boolean;
   paperSize?: string;
+  customPaperWidth?: number | null;
+  customPaperHeight?: number | null;
+  receiptPrinterName?: string;
+  kotPrinterName?: string;
   shopName?: string;
   shopAddress?: string;
   shopPhone?: string;

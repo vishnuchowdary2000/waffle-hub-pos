@@ -1409,7 +1409,12 @@ export const GetStoreSettingsResponse = zod.object({
   "receiptPrinting": zod.boolean().optional(),
   "kotPrinting": zod.boolean().optional(),
   "autoPrint": zod.boolean().optional(),
+  "autoPrintReceipt": zod.boolean().optional(),
   "paperSize": zod.string().optional(),
+  "customPaperWidth": zod.number().nullish(),
+  "customPaperHeight": zod.number().nullish(),
+  "receiptPrinterName": zod.string().optional(),
+  "kotPrinterName": zod.string().optional(),
   "shopName": zod.string().optional(),
   "shopAddress": zod.string().optional(),
   "shopPhone": zod.string().optional(),
@@ -1432,7 +1437,12 @@ export const UpdateStoreSettingsBody = zod.object({
   "receiptPrinting": zod.boolean().optional(),
   "kotPrinting": zod.boolean().optional(),
   "autoPrint": zod.boolean().optional(),
+  "autoPrintReceipt": zod.boolean().optional(),
   "paperSize": zod.string().optional(),
+  "customPaperWidth": zod.number().nullish(),
+  "customPaperHeight": zod.number().nullish(),
+  "receiptPrinterName": zod.string().optional(),
+  "kotPrinterName": zod.string().optional(),
   "shopName": zod.string().optional(),
   "shopAddress": zod.string().optional(),
   "shopPhone": zod.string().optional(),
@@ -1450,7 +1460,12 @@ export const UpdateStoreSettingsResponse = zod.object({
   "receiptPrinting": zod.boolean().optional(),
   "kotPrinting": zod.boolean().optional(),
   "autoPrint": zod.boolean().optional(),
+  "autoPrintReceipt": zod.boolean().optional(),
   "paperSize": zod.string().optional(),
+  "customPaperWidth": zod.number().nullish(),
+  "customPaperHeight": zod.number().nullish(),
+  "receiptPrinterName": zod.string().optional(),
+  "kotPrinterName": zod.string().optional(),
   "shopName": zod.string().optional(),
   "shopAddress": zod.string().optional(),
   "shopPhone": zod.string().optional(),
@@ -1533,6 +1548,7 @@ export const ListPrintHistoryResponseItem = zod.object({
   "action": zod.string(),
   "printedBy": zod.string(),
   "paperSize": zod.string(),
+  "printerName": zod.string(),
   "printedAt": zod.string()
 })
 export const ListPrintHistoryResponse = zod.array(ListPrintHistoryResponseItem)
@@ -1547,7 +1563,8 @@ export const LogPrintBody = zod.object({
   "type": zod.string(),
   "action": zod.string(),
   "printedBy": zod.string(),
-  "paperSize": zod.string()
+  "paperSize": zod.string(),
+  "printerName": zod.string().optional()
 })
 
 

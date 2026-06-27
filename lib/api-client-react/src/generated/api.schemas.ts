@@ -468,7 +468,12 @@ export interface StoreSettings {
   receiptPrinting?: boolean;
   kotPrinting?: boolean;
   autoPrint?: boolean;
+  autoPrintReceipt?: boolean;
   paperSize?: string;
+  customPaperWidth?: number | null;
+  customPaperHeight?: number | null;
+  receiptPrinterName?: string;
+  kotPrinterName?: string;
   shopName?: string;
   shopAddress?: string;
   shopPhone?: string;
@@ -487,7 +492,12 @@ export interface StoreSettingsInput {
   receiptPrinting?: boolean;
   kotPrinting?: boolean;
   autoPrint?: boolean;
+  autoPrintReceipt?: boolean;
   paperSize?: string;
+  customPaperWidth?: number | null;
+  customPaperHeight?: number | null;
+  receiptPrinterName?: string;
+  kotPrinterName?: string;
   shopName?: string;
   shopAddress?: string;
   shopPhone?: string;
@@ -504,6 +514,7 @@ export interface PrintHistoryItem {
   action: string;
   printedBy: string;
   paperSize: string;
+  printerName: string;
   printedAt: string;
 }
 
@@ -514,6 +525,7 @@ export interface PrintHistoryInput {
   action: string;
   printedBy: string;
   paperSize: string;
+  printerName?: string;
 }
 
 export interface StoreAnnouncement {

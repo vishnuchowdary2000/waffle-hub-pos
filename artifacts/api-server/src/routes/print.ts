@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db, printHistoryTable } from "@workspace/db";
 import { requireRole } from "../middleware/auth";
 
@@ -12,10 +12,11 @@ router.get("/print/history", requireRole("admin", "counter", "kitchen"), async (
   if (orderId) {
     rows = await db.select().from(printHistoryTable)
       .where(eq(printHistoryTable.orderId, orderId))
-      .orderBy(printHistoryTable.printedAt);
+      .orderBy(desc(printHistoryTable.printedAt));
   } else {
     rows = await db.select().from(printHistoryTable)
-      .orderBy(printHistoryTable.printedAt);
+      .orderBy(desc(printHistoryTable.printedAt))
+      .limit(100);
   }
 
   res.json(rows.map(r => ({
@@ -26,25 +27,27 @@ router.get("/print/history", requireRole("admin", "counter", "kitchen"), async (
     action:      r.action,
     printedBy:   r.printedBy,
     paperSize:   r.paperSize,
+    printerName: r.printerName,
     printedAt:   r.printedAt.toISOString(),
   })));
 });
 
 // ── POST /print/history ───────────────────────────────────────────────────────
 router.post("/print/history", requireRole("admin", "counter", "kitchen"), async (req, res): Promise<void> => {
-  const { orderId, orderNumber, type, action, printedBy, paperSize } = req.body as {
+  const { orderId, orderNumber, type, action, printedBy, paperSize, printerName } = req.body as {
     orderId: number; orderNumber: string;
     type: string; action: string;
-    printedBy: string; paperSize: string;
+    printedBy: string; paperSize: string; printerName?: string;
   };
 
   if (!orderId || !orderNumber || !type || !action || !printedBy || !paperSize) {
-    res.status(400).json({ error: "All fields are required" });
+    res.status(400).json({ error: "All required fields must be provided" });
     return;
   }
 
   const [row] = await db.insert(printHistoryTable).values({
     orderId, orderNumber, type, action, printedBy, paperSize,
+    printerName: printerName ?? "",
   }).returning();
 
   res.status(201).json({
@@ -55,6 +58,7 @@ router.post("/print/history", requireRole("admin", "counter", "kitchen"), async 
     action:      row.action,
     printedBy:   row.printedBy,
     paperSize:   row.paperSize,
+    printerName: row.printerName,
     printedAt:   row.printedAt.toISOString(),
   });
 });

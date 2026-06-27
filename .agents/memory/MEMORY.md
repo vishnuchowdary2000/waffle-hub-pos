@@ -2,3 +2,5 @@
 - [OpenAPI + Orval codegen workflow](orval-codegen.md) — always edit spec first, run codegen, then write server+frontend; codegen cleans output folder so never hand-write generated files.
 - [Drizzle groupBy with COALESCE](drizzle-coalesce-groupby.md) — use sql template for COALESCE in both SELECT and groupBy to avoid Drizzle type errors with nullable columns.
 - [Table API type shape](table-type-shape.md) — generated `Table` type uses `number` (not `tableNumber`) for the column; `TableReportItem` uses `orderCount`/`revenue` (no `avgOrderValue`).
+- [DB schema push workaround](db-push-workaround.md) — drizzle-kit push fails non-interactively; use executeSql for column additions.
+- [Print settings architecture](print-settings.md) — printer names are advisory only (browser can't route to specific printers); they appear in print window title + history log.

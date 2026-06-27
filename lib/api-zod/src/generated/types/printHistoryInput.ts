@@ -13,4 +13,5 @@ export interface PrintHistoryInput {
   action: string;
   printedBy: string;
   paperSize: string;
+  printerName?: string;
 }

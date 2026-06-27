@@ -1949,45 +1949,55 @@ components:
       type: object
       required: [manualOverride, isOpen, openTime, closeTime, updatedAt]
       properties:
-        manualOverride:    { type: boolean }
-        isOpen:            { type: boolean }
-        openTime:          { type: string }
-        closeTime:         { type: string }
-        contactNumber:     { type: string }
-        receiptPrinting:   { type: boolean }
-        kotPrinting:       { type: boolean }
-        autoPrint:         { type: boolean }
-        paperSize:         { type: string }
-        shopName:          { type: string }
-        shopAddress:       { type: string }
-        shopPhone:         { type: string }
-        fssaiNumber:       { type: string }
-        gstNumber:         { type: string }
-        thankYouMessage:   { type: string }
-        updatedAt:         { type: string }
+        manualOverride:      { type: boolean }
+        isOpen:              { type: boolean }
+        openTime:            { type: string }
+        closeTime:           { type: string }
+        contactNumber:       { type: string }
+        receiptPrinting:     { type: boolean }
+        kotPrinting:         { type: boolean }
+        autoPrint:           { type: boolean }
+        autoPrintReceipt:    { type: boolean }
+        paperSize:           { type: string }
+        customPaperWidth:    { type: integer, nullable: true }
+        customPaperHeight:   { type: integer, nullable: true }
+        receiptPrinterName:  { type: string }
+        kotPrinterName:      { type: string }
+        shopName:            { type: string }
+        shopAddress:         { type: string }
+        shopPhone:           { type: string }
+        fssaiNumber:         { type: string }
+        gstNumber:           { type: string }
+        thankYouMessage:     { type: string }
+        updatedAt:           { type: string }
 
     StoreSettingsInput:
       type: object
       properties:
-        manualOverride:    { type: boolean }
-        isOpen:            { type: boolean }
-        openTime:          { type: string }
-        closeTime:         { type: string }
-        contactNumber:     { type: string }
-        receiptPrinting:   { type: boolean }
-        kotPrinting:       { type: boolean }
-        autoPrint:         { type: boolean }
-        paperSize:         { type: string }
-        shopName:          { type: string }
-        shopAddress:       { type: string }
-        shopPhone:         { type: string }
-        fssaiNumber:       { type: string }
-        gstNumber:         { type: string }
-        thankYouMessage:   { type: string }
+        manualOverride:      { type: boolean }
+        isOpen:              { type: boolean }
+        openTime:            { type: string }
+        closeTime:           { type: string }
+        contactNumber:       { type: string }
+        receiptPrinting:     { type: boolean }
+        kotPrinting:         { type: boolean }
+        autoPrint:           { type: boolean }
+        autoPrintReceipt:    { type: boolean }
+        paperSize:           { type: string }
+        customPaperWidth:    { type: integer, nullable: true }
+        customPaperHeight:   { type: integer, nullable: true }
+        receiptPrinterName:  { type: string }
+        kotPrinterName:      { type: string }
+        shopName:            { type: string }
+        shopAddress:         { type: string }
+        shopPhone:           { type: string }
+        fssaiNumber:         { type: string }
+        gstNumber:           { type: string }
+        thankYouMessage:     { type: string }
 
     PrintHistoryItem:
       type: object
-      required: [id, orderId, orderNumber, type, action, printedBy, paperSize, printedAt]
+      required: [id, orderId, orderNumber, type, action, printedBy, paperSize, printerName, printedAt]
       properties:
         id:          { type: integer }
         orderId:     { type: integer }
@@ -1996,6 +2006,7 @@ components:
         action:      { type: string }
         printedBy:   { type: string }
         paperSize:   { type: string }
+        printerName: { type: string }
         printedAt:   { type: string }
 
     PrintHistoryInput:
@@ -2008,6 +2019,7 @@ components:
         action:      { type: string }
         printedBy:   { type: string }
         paperSize:   { type: string }
+        printerName: { type: string }
 
     StoreAnnouncement:
       type: object

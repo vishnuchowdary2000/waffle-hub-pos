@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { ArrowLeft, CheckCircle, Banknote, Smartphone, CreditCard, Phone, ShoppingBag, UtensilsCrossed, XCircle, AlertTriangle, Printer, RotateCcw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGetStoreSettings, getGetStoreSettingsQueryKey } from "@workspace/api-client-react";
-import { type PaperSize, printReceipt } from "@/lib/printService";
+import { type PaperSize, printReceipt, printKOT } from "@/lib/printService";
 
 const statusClass: Record<string, string> = {
   pending_payment: "status-pending_payment",
@@ -110,31 +110,19 @@ export default function Billing() {
     charityAmount: charityAmt,
   };
 
-  const handleSave = () => {
-    const afterSave = () => {
-      qc.invalidateQueries({ queryKey: getGetOrderQueryKey(orderId) });
-      qc.invalidateQueries({ queryKey: getGetOrderPaymentQueryKey(orderId) });
-      qc.invalidateQueries({ queryKey: getListOrdersQueryKey() });
-      qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
-      if (isPaid) navigate("/dashboard");
-    };
-
-    if (existingPayment) {
-      updatePayment.mutate({ id: orderId, data: { cashAmount: cashAmt, upiAmount: upiAmt, cardAmount: cardAmt, ...payloadExtras } }, {
-        onSuccess: () => {
-          if (order.status === "pending_payment") {
-            updateStatus.mutate({ id: orderId, data: { status: "approved" } }, { onSuccess: afterSave });
-          } else {
-            afterSave();
-          }
-        },
-      });
-    } else {
-      createPayment.mutate({ id: orderId, data: { totalAmount, cashAmount: cashAmt, upiAmount: upiAmt, cardAmount: cardAmt, ...payloadExtras } }, {
-        onSuccess: () => afterSave(),
-      });
-    }
-  };
+  const buildShopInfo = () => ({
+    shopName:           settings?.shopName           ?? "The Waffle Hub",
+    shopAddress:        settings?.shopAddress        ?? "",
+    shopPhone:          settings?.shopPhone          ?? "",
+    fssaiNumber:        settings?.fssaiNumber        ?? "",
+    gstNumber:          settings?.gstNumber          ?? "",
+    thankYouMessage:    settings?.thankYouMessage    ?? "Thank you for visiting! See you again.",
+    paperSize:          (settings?.paperSize         ?? "80mm") as PaperSize,
+    customPaperWidth:   settings?.customPaperWidth   ?? null,
+    customPaperHeight:  settings?.customPaperHeight  ?? null,
+    receiptPrinterName: settings?.receiptPrinterName ?? "",
+    kotPrinterName:     settings?.kotPrinterName     ?? "",
+  });
 
   const handlePrintReceipt = (action: "printed" | "reprinted") => {
     if (!order || !existingPayment) return;
@@ -168,18 +156,94 @@ export default function Billing() {
         cashierName,
         createdAt: order.createdAt,
       },
-      {
-        shopName:        settings?.shopName        ?? "The Waffle Hub",
-        shopAddress:     settings?.shopAddress     ?? "",
-        shopPhone:       settings?.shopPhone       ?? "",
-        fssaiNumber:     settings?.fssaiNumber     ?? "",
-        gstNumber:       settings?.gstNumber       ?? "",
-        thankYouMessage: settings?.thankYouMessage ?? "Thank you for visiting! See you again.",
-        paperSize:       (settings?.paperSize      ?? "80mm") as PaperSize,
-      },
+      buildShopInfo(),
       order.id,
       action
     );
+  };
+
+  const handlePrintKOT = (action: "printed" | "reprinted" = "reprinted") => {
+    if (!order) return;
+    const cashierName = user?.displayName ?? user?.username ?? "Cashier";
+    printKOT(
+      {
+        orderNumber: order.orderNumber,
+        orderType: order.orderType,
+        customerName: order.customerName,
+        specialInstructions: order.notes,
+        items: order.items.map(item => ({
+          productName: item.productName,
+          quantity: item.quantity,
+          isAddon: item.isAddon,
+        })),
+        createdAt: order.createdAt,
+      },
+      buildShopInfo(),
+      order.id,
+      cashierName,
+      action,
+    );
+  };
+
+  const autoPrintAfterSave = (cashAmount: number, upiAmount: number, cardAmount: number) => {
+    if (!order) return;
+    const cashierName = user?.displayName ?? user?.username ?? "Cashier";
+    const shop = buildShopInfo();
+    const discountAmt = discountType === "percentage"
+      ? order.totalAmount * (parseFloat(discountValue) / 100)
+      : discountType === "fixed" ? parseFloat(discountValue) || 0 : 0;
+    const balanceNow = finalAmount - cashAmount - upiAmount - cardAmount;
+
+    if (settings?.autoPrintReceipt && settings.receiptPrinting) {
+      printReceipt({
+        orderNumber: order.orderNumber, orderType: order.orderType,
+        customerName: order.customerName, customerPhone: order.customerPhone,
+        specialInstructions: order.notes,
+        items: order.items.map(item => ({ productName: item.productName, quantity: item.quantity, price: item.price, isAddon: item.isAddon })),
+        totalAmount: order.totalAmount, cashAmount, upiAmount, cardAmount,
+        discountAmount: discountAmt, charityAmount: charityAmt,
+        balance: balanceNow, cashierName, createdAt: order.createdAt,
+      }, shop, order.id, "printed");
+    }
+
+    if (settings?.autoPrint && settings.kotPrinting) {
+      printKOT({
+        orderNumber: order.orderNumber, orderType: order.orderType,
+        customerName: order.customerName, specialInstructions: order.notes,
+        items: order.items.map(item => ({ productName: item.productName, quantity: item.quantity, isAddon: item.isAddon })),
+        createdAt: order.createdAt,
+      }, shop, order.id, cashierName, "printed");
+    }
+  };
+
+  const handleSave = () => {
+    const afterSave = () => {
+      qc.invalidateQueries({ queryKey: getGetOrderQueryKey(orderId) });
+      qc.invalidateQueries({ queryKey: getGetOrderPaymentQueryKey(orderId) });
+      qc.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+      qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+      if (isPaid) navigate("/dashboard");
+    };
+
+    if (existingPayment) {
+      updatePayment.mutate({ id: orderId, data: { cashAmount: cashAmt, upiAmount: upiAmt, cardAmount: cardAmt, ...payloadExtras } }, {
+        onSuccess: () => {
+          if (isPaid) autoPrintAfterSave(cashAmt, upiAmt, cardAmt);
+          if (order.status === "pending_payment") {
+            updateStatus.mutate({ id: orderId, data: { status: "approved" } }, { onSuccess: afterSave });
+          } else {
+            afterSave();
+          }
+        },
+      });
+    } else {
+      createPayment.mutate({ id: orderId, data: { totalAmount, cashAmount: cashAmt, upiAmount: upiAmt, cardAmount: cardAmt, ...payloadExtras } }, {
+        onSuccess: () => {
+          if (isPaid) autoPrintAfterSave(cashAmt, upiAmt, cardAmt);
+          afterSave();
+        },
+      });
+    }
   };
 
   return (
@@ -510,21 +574,44 @@ export default function Billing() {
           ) : "Save Partial Payment"}
         </button>
 
-        {settings?.receiptPrinting && existingPayment && (
-          <div className="flex gap-2 pt-1">
-            <button
-              onClick={() => handlePrintReceipt("printed")}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-secondary text-foreground border border-border hover:bg-muted text-sm font-semibold transition-colors"
-            >
-              <Printer size={15} /> Print Receipt
-            </button>
-            <button
-              onClick={() => handlePrintReceipt("reprinted")}
-              title="Reprint Receipt"
-              className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-secondary text-muted-foreground border border-border hover:text-foreground text-sm font-semibold transition-colors"
-            >
-              <RotateCcw size={14} /> Reprint
-            </button>
+        {(settings?.receiptPrinting || settings?.kotPrinting) && existingPayment && (
+          <div className="space-y-2 pt-1">
+            {settings.receiptPrinting && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handlePrintReceipt("printed")}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-secondary text-foreground border border-border hover:bg-muted text-sm font-semibold transition-colors"
+                >
+                  <Printer size={15} /> Print Receipt
+                  {settings.receiptPrinterName && <span className="text-xs text-muted-foreground">({settings.receiptPrinterName})</span>}
+                </button>
+                <button
+                  onClick={() => handlePrintReceipt("reprinted")}
+                  title="Reprint Receipt"
+                  className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-secondary text-muted-foreground border border-border hover:text-foreground text-sm font-semibold transition-colors"
+                >
+                  <RotateCcw size={14} /> Reprint
+                </button>
+              </div>
+            )}
+            {settings.kotPrinting && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handlePrintKOT("printed")}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-secondary text-foreground border border-border hover:bg-muted text-sm font-semibold transition-colors"
+                >
+                  <Printer size={15} /> Print KOT
+                  {settings.kotPrinterName && <span className="text-xs text-muted-foreground">({settings.kotPrinterName})</span>}
+                </button>
+                <button
+                  onClick={() => handlePrintKOT("reprinted")}
+                  title="Reprint KOT"
+                  className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-secondary text-muted-foreground border border-border hover:text-foreground text-sm font-semibold transition-colors"
+                >
+                  <RotateCcw size={14} /> Reprint
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>}

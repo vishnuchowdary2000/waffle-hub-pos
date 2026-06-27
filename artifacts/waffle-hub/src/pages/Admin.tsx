@@ -21,6 +21,7 @@ import {
   useListTables,
   useConfigureTables,
   useUpdateTableStatus,
+  useListPrintHistory,
   getListCustomersQueryKey,
   getListExpensesQueryKey,
   getGetDailyReportQueryKey,
@@ -29,6 +30,7 @@ import {
   getGetStoreSettingsQueryKey,
   getListStoreAnnouncementsQueryKey,
   getListTablesQueryKey,
+  getListPrintHistoryQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -40,7 +42,7 @@ import {
   TrendingUp, TrendingDown, ShieldCheck,
   UserCog, KeyRound, ToggleLeft, ToggleRight, ChefHat, ShoppingBag,
   Store, Megaphone, Clock, Check, Pencil, Phone,
-  Printer, MapPin, FileText, LayoutGrid, QrCode, Download,
+  Printer, MapPin, FileText, LayoutGrid, QrCode, Download, History,
 } from "lucide-react";
 import { type PaperSize, triggerBrowserPrint, generateReceiptHTML } from "@/lib/printService";
 
@@ -883,7 +885,17 @@ function StoreTab() {
     );
   };
 
-  const togglePrintSetting = (key: "receiptPrinting" | "kotPrinting" | "autoPrint", value: boolean) => {
+  // Printer name inputs
+  const [receiptPrinterName, setReceiptPrinterName] = useState("");
+  const [kotPrinterName, setKotPrinterName] = useState("");
+  const [printersSaved, setPrintersSaved] = useState(false);
+
+  // Custom paper state
+  const [customPaperWidth, setCustomPaperWidth] = useState("");
+  const [customPaperHeight, setCustomPaperHeight] = useState("");
+  const [customPaperSaved, setCustomPaperSaved] = useState(false);
+
+  const togglePrintSetting = (key: "receiptPrinting" | "kotPrinting" | "autoPrint" | "autoPrintReceipt", value: boolean) => {
     updateSettings.mutate(
       { data: { [key]: value } },
       { onSuccess: () => qc.invalidateQueries({ queryKey: getGetStoreSettingsQueryKey() }) }
@@ -896,6 +908,41 @@ function StoreTab() {
       { onSuccess: () => qc.invalidateQueries({ queryKey: getGetStoreSettingsQueryKey() }) }
     );
   };
+
+  const saveCustomPaper = () => {
+    const w = parseInt(customPaperWidth) || (settings?.customPaperWidth ?? 80);
+    const h = customPaperHeight !== "" ? (parseInt(customPaperHeight) || null) : (settings?.customPaperHeight ?? null);
+    updateSettings.mutate(
+      { data: { paperSize: "custom", customPaperWidth: w, customPaperHeight: h } },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getGetStoreSettingsQueryKey() });
+          setCustomPaperSaved(true);
+          setTimeout(() => setCustomPaperSaved(false), 2000);
+        },
+      }
+    );
+  };
+
+  const savePrinterNames = () => {
+    const rp = receiptPrinterName !== "" ? receiptPrinterName : (settings?.receiptPrinterName ?? "");
+    const kp = kotPrinterName     !== "" ? kotPrinterName     : (settings?.kotPrinterName     ?? "");
+    updateSettings.mutate(
+      { data: { receiptPrinterName: rp, kotPrinterName: kp } },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getGetStoreSettingsQueryKey() });
+          setPrintersSaved(true);
+          setTimeout(() => setPrintersSaved(false), 2000);
+        },
+      }
+    );
+  };
+
+  const { data: printHistory = [] } = useListPrintHistory(
+    {},
+    { query: { queryKey: getListPrintHistoryQueryKey({}) } }
+  );
 
   const saveShopInfo = () => {
     updateSettings.mutate(
@@ -921,13 +968,15 @@ function StoreTab() {
 
   const previewReceipt = () => {
     const shopInfo = {
-      shopName:        shopName        || settings?.shopName        || "The Waffle Hub",
-      shopAddress:     shopAddress     || settings?.shopAddress     || "",
-      shopPhone:       shopPhone       || settings?.shopPhone       || "",
-      fssaiNumber:     fssaiNumber     || settings?.fssaiNumber     || "",
-      gstNumber:       gstNumber       || settings?.gstNumber       || "",
-      thankYouMessage: thankYouMessage || settings?.thankYouMessage || "Thank you for visiting! See you again.",
-      paperSize:       (settings?.paperSize ?? "80mm") as PaperSize,
+      shopName:          shopName          || settings?.shopName          || "The Waffle Hub",
+      shopAddress:       shopAddress       || settings?.shopAddress       || "",
+      shopPhone:         shopPhone         || settings?.shopPhone         || "",
+      fssaiNumber:       fssaiNumber       || settings?.fssaiNumber       || "",
+      gstNumber:         gstNumber         || settings?.gstNumber         || "",
+      thankYouMessage:   thankYouMessage   || settings?.thankYouMessage   || "Thank you for visiting! See you again.",
+      paperSize:         (settings?.paperSize ?? "80mm") as PaperSize,
+      customPaperWidth:  settings?.customPaperWidth  ?? null,
+      customPaperHeight: settings?.customPaperHeight ?? null,
     };
     const sampleReceipt = {
       orderNumber: "ORD-SAMPLE",
@@ -1270,9 +1319,10 @@ function StoreTab() {
         {/* Toggles */}
         <div className="space-y-3">
           {([
-            { key: "receiptPrinting" as const, label: "Receipt Printing", desc: "Show print buttons on the Billing page" },
-            { key: "kotPrinting"     as const, label: "KOT Printing",     desc: "Show Print KOT button on Kitchen cards" },
-            { key: "autoPrint"       as const, label: "Auto-Print KOT",   desc: "Automatically trigger KOT print when order is approved" },
+            { key: "receiptPrinting"  as const, label: "Receipt Printing",       desc: "Show print buttons on the Billing page" },
+            { key: "kotPrinting"      as const, label: "KOT Printing",            desc: "Show Print KOT button on Kitchen cards" },
+            { key: "autoPrint"        as const, label: "Auto-Print KOT",          desc: "Automatically print KOT when an order is placed" },
+            { key: "autoPrintReceipt" as const, label: "Auto-Print Receipt",      desc: "Automatically print receipt when payment is collected" },
           ] as const).map(({ key, label, desc }) => {
             const active = !!(settings?.[key]);
             return (
@@ -1297,9 +1347,41 @@ function StoreTab() {
           })}
         </div>
 
+        {/* Printer assignment */}
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Printer Assignment</p>
+          <div className="grid grid-cols-1 gap-2">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Customer Receipt Printer</label>
+              <input
+                value={receiptPrinterName}
+                onChange={e => setReceiptPrinterName(e.target.value)}
+                placeholder={settings?.receiptPrinterName || "e.g. Front Desk Printer"}
+                className="w-full bg-secondary border border-input rounded-xl px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Kitchen KOT Printer</label>
+              <input
+                value={kotPrinterName}
+                onChange={e => setKotPrinterName(e.target.value)}
+                placeholder={settings?.kotPrinterName || "e.g. Kitchen Printer"}
+                className="w-full bg-secondary border border-input rounded-xl px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+          </div>
+          <button
+            onClick={savePrinterNames}
+            disabled={updateSettings.isPending}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary text-muted-foreground border border-border hover:text-foreground text-xs font-semibold transition-colors disabled:opacity-50"
+          >
+            {printersSaved ? <><Check size={13} /> Saved!</> : <><Printer size={13} /> Save Printer Names</>}
+          </button>
+        </div>
+
         {/* Paper size */}
-        <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Paper Size</p>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Paper Size</p>
           <div className="flex gap-2">
             {(["58mm", "80mm", "A4"] as const).map(size => (
               <button
@@ -1315,7 +1397,51 @@ function StoreTab() {
                 {size}
               </button>
             ))}
+            <button
+              onClick={() => savePaperSize("custom")}
+              className={cn(
+                "flex-1 py-2 rounded-xl text-xs font-bold border transition-colors",
+                (settings?.paperSize ?? "") === "custom"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-secondary text-muted-foreground border-border hover:text-foreground"
+              )}
+            >
+              Custom
+            </button>
           </div>
+          {(settings?.paperSize ?? "") === "custom" && (
+            <div className="bg-secondary/60 border border-border rounded-xl p-3 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Width (mm)</label>
+                  <input
+                    type="number" min="40" max="250"
+                    value={customPaperWidth}
+                    onChange={e => setCustomPaperWidth(e.target.value)}
+                    placeholder={String(settings?.customPaperWidth ?? 80)}
+                    className="w-full bg-background border border-input rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Height (mm, blank = auto)</label>
+                  <input
+                    type="number" min="50"
+                    value={customPaperHeight}
+                    onChange={e => setCustomPaperHeight(e.target.value)}
+                    placeholder={settings?.customPaperHeight ? String(settings.customPaperHeight) : "Auto"}
+                    className="w-full bg-background border border-input rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={saveCustomPaper}
+                disabled={updateSettings.isPending}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/15 text-primary border border-primary/30 text-xs font-bold transition-colors hover:bg-primary/25 disabled:opacity-50"
+              >
+                {customPaperSaved ? <><Check size={12} /> Saved!</> : "Apply Custom Size"}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Preview receipt */}
@@ -1325,6 +1451,57 @@ function StoreTab() {
         >
           <FileText size={13} /> Preview Sample Receipt
         </button>
+      </div>
+
+      {/* ── Print History ─────────────────────────────────────────────────── */}
+      <div className="bg-card border border-card-border rounded-xl p-5 space-y-4">
+        <div className="flex items-center gap-2.5">
+          <History size={16} className="text-primary" />
+          <h2 className="text-sm font-bold text-foreground">Print History</h2>
+          <span className="ml-auto text-xs text-muted-foreground">Last 100 records</span>
+        </div>
+        {printHistory.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">No print records yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-muted-foreground border-b border-border">
+                  <th className="text-left pb-2 font-semibold">Time</th>
+                  <th className="text-left pb-2 font-semibold">Order</th>
+                  <th className="text-left pb-2 font-semibold">Type</th>
+                  <th className="text-left pb-2 font-semibold">Action</th>
+                  <th className="text-left pb-2 font-semibold">Printer</th>
+                  <th className="text-left pb-2 font-semibold">By</th>
+                  <th className="text-left pb-2 font-semibold">Paper</th>
+                </tr>
+              </thead>
+              <tbody>
+                {printHistory.slice(0, 20).map(row => (
+                  <tr key={row.id} className="border-b border-border/50 hover:bg-secondary/50">
+                    <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">
+                      {new Date(row.printedAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true })}
+                    </td>
+                    <td className="py-1.5 pr-3 font-mono text-primary">{row.orderNumber}</td>
+                    <td className="py-1.5 pr-3">
+                      <span className={cn("px-1.5 py-0.5 rounded font-semibold uppercase", row.type === "receipt" ? "bg-blue-500/10 text-blue-400" : "bg-green-500/10 text-green-400")}>
+                        {row.type}
+                      </span>
+                    </td>
+                    <td className="py-1.5 pr-3">
+                      <span className={cn("px-1.5 py-0.5 rounded", row.action === "reprinted" ? "bg-amber-500/10 text-amber-400" : "text-muted-foreground")}>
+                        {row.action}
+                      </span>
+                    </td>
+                    <td className="py-1.5 pr-3 text-muted-foreground">{row.printerName || "—"}</td>
+                    <td className="py-1.5 pr-3 text-muted-foreground">{row.printedBy}</td>
+                    <td className="py-1.5 text-muted-foreground">{row.paperSize}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* ── Shop Info ─────────────────────────────────────────────────────── */}

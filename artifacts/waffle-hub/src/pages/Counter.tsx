@@ -3,7 +3,9 @@ import {
   useListCategories, useListProducts, useCreateOrder,
   useCreateOrderPayment, useUpdateOrderStatus, useListCustomers, useListOrders,
   useListOffers,
+  useGetStoreSettings,
   getListOrdersQueryKey, getGetDashboardQueryKey, getListCustomersQueryKey,
+  getGetStoreSettingsQueryKey,
 } from "@workspace/api-client-react";
 import type { Offer } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -15,6 +17,8 @@ import {
   CheckCircle, X, ShoppingBag, UtensilsCrossed, UserRound, Clock, Tag,
   Bell, BellOff, QrCode,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { printKOT, type PaperSize } from "@/lib/printService";
 
 type ItemOrderType = "dine_in" | "takeaway";
 
@@ -112,6 +116,7 @@ function computeDiscount(offer: Offer, items: CartItem[]): number {
 
 export default function Counter() {
   const qc = useQueryClient();
+  const { user } = useAuth();
 
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -128,6 +133,7 @@ export default function Counter() {
   const [search, setSearch] = useState("");
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
   const [selectedOfferId, setSelectedOfferId] = useState<number | null>(null);
+  const { data: settings } = useGetStoreSettings({ query: { queryKey: getGetStoreSettingsQueryKey() } });
   const { data: categories = [] } = useListCategories();
   const { data: allProducts = [] } = useListProducts({ active: true });
   const { data: activeOffers = [] } = useListOffers({ active: true });
@@ -318,6 +324,39 @@ export default function Counter() {
         });
         resetForm();
         qc.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+
+        if (settings?.autoPrint && settings.kotPrinting) {
+          const staffName = user?.displayName ?? user?.username ?? "Staff";
+          printKOT(
+            {
+              orderNumber: order.orderNumber,
+              orderType: order.orderType,
+              customerName: order.customerName,
+              specialInstructions: order.notes,
+              items: order.items.map(item => ({
+                productName: item.productName,
+                quantity: item.quantity,
+                isAddon: item.isAddon,
+              })),
+              createdAt: order.createdAt,
+            },
+            {
+              shopName:          settings.shopName          ?? "The Waffle Hub",
+              shopAddress:       settings.shopAddress       ?? "",
+              shopPhone:         settings.shopPhone         ?? "",
+              fssaiNumber:       settings.fssaiNumber       ?? "",
+              gstNumber:         settings.gstNumber         ?? "",
+              thankYouMessage:   settings.thankYouMessage   ?? "Thank you!",
+              paperSize:         (settings.paperSize        ?? "80mm") as PaperSize,
+              customPaperWidth:  settings.customPaperWidth  ?? null,
+              customPaperHeight: settings.customPaperHeight ?? null,
+              kotPrinterName:    settings.kotPrinterName    ?? "",
+            },
+            order.id,
+            staffName,
+            "printed",
+          );
+        }
       },
     });
   };

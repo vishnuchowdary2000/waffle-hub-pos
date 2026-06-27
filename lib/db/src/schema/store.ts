@@ -13,7 +13,12 @@ export const storeSettingsTable = pgTable("store_settings", {
   receiptPrinting: boolean("receipt_printing").notNull().default(false),
   kotPrinting: boolean("kot_printing").notNull().default(false),
   autoPrint: boolean("auto_print").notNull().default(false),
+  autoPrintReceipt: boolean("auto_print_receipt").notNull().default(false),
   paperSize: text("paper_size").notNull().default("80mm"),
+  customPaperWidth: integer("custom_paper_width"),
+  customPaperHeight: integer("custom_paper_height"),
+  receiptPrinterName: text("receipt_printer_name").notNull().default(""),
+  kotPrinterName: text("kot_printer_name").notNull().default(""),
   // Shop info (used in receipt/KOT templates)
   shopName: text("shop_name").notNull().default("The Waffle Hub"),
   shopAddress: text("shop_address").notNull().default(""),
@@ -48,6 +53,7 @@ export const printHistoryTable = pgTable("print_history", {
   action: text("action").notNull(),
   printedBy: text("printed_by").notNull(),
   paperSize: text("paper_size").notNull(),
+  printerName: text("printer_name").notNull().default(""),
   printedAt: timestamp("printed_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
