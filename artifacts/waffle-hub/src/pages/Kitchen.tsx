@@ -565,6 +565,11 @@ function KitchenCard({
             Part {subOrder!.subCode}
           </span>
         )}
+        {order.tableNumber != null && (
+          <span className="flex items-center gap-1 text-xs font-black text-amber-400 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-full">
+            🪑 T{order.tableNumber}
+          </span>
+        )}
         <span className="font-mono text-xs text-muted-foreground">{displayNumber}</span>
         {hasNewItems && (
           <span className="flex items-center gap-1 text-xs font-bold text-orange-400 bg-orange-500/15 border border-orange-500/30 px-2 py-0.5 rounded-full">

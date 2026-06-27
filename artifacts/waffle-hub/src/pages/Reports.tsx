@@ -2,7 +2,9 @@ import { useState, useMemo } from "react";
 import { useRole } from "@/contexts/AuthContext";
 import {
   useGetReportRange,
+  useGetTableReport,
   getGetReportRangeQueryKey,
+  getGetTableReportQueryKey,
 } from "@workspace/api-client-react";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -15,6 +17,7 @@ import {
   ShieldX,
   TrendingDown,
   TrendingUp,
+  LayoutGrid,
 } from "lucide-react";
 
 type FilterMode = "today" | "date" | "range" | "monthly" | "last6" | "last12";
@@ -78,6 +81,11 @@ export default function Reports() {
   const { data: report, isLoading, refetch } = useGetReportRange(
     { from, to },
     { query: { queryKey: getGetReportRangeQueryKey({ from, to }) } }
+  );
+
+  const { data: tableReport = [] } = useGetTableReport(
+    { from, to },
+    { query: { queryKey: getGetTableReportQueryKey({ from, to }) } }
   );
 
   if (role && role !== "admin") {
@@ -400,6 +408,38 @@ export default function Reports() {
               </div>
             )}
           </div>
+
+          {/* ── Table Performance ── */}
+          {tableReport.length > 0 && (
+            <div>
+              <h2 className="text-base font-bold text-foreground mb-3 flex items-center gap-2">
+                <LayoutGrid size={16} className="text-primary" />
+                Table Performance
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {tableReport.map(t => (
+                  <div key={t.tableNumber} className="bg-card border border-card-border rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="font-bold text-foreground">Table {t.tableNumber}</span>
+                      <span className="text-sm font-bold text-primary">{formatCurrency(t.revenue)}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                      <div>
+                        <p className="text-foreground font-semibold text-sm">{t.orderCount}</p>
+                        <p>orders</p>
+                      </div>
+                      <div>
+                        <p className="text-foreground font-semibold text-sm">
+                          {t.orderCount > 0 ? formatCurrency(t.revenue / t.orderCount) : "—"}
+                        </p>
+                        <p>avg value</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* ── Summary ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-4">

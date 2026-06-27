@@ -14,6 +14,7 @@ import publicRouter from "./public";
 import storeRouter from "./store";
 import printRouter from "./print";
 import productionRouter from "./production";
+import tablesRouter from "./tables";
 
 const router: IRouter = Router();
 
@@ -32,6 +33,7 @@ router.use(reportsRouter);
 router.use(usersRouter);
 router.use(printRouter);
 router.use(productionRouter);
+router.use(tablesRouter);
 
 void seedDefaultUsers();
 

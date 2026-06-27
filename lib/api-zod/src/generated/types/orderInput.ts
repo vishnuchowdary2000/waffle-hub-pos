@@ -17,5 +17,6 @@ export interface OrderInput {
   notes?: string;
   /** @nullable */
   offerId?: number | null;
+  tableNumber?: number;
   items?: OrderItemInput[];
 }

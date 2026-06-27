@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, gte, lte, and, sql } from "drizzle-orm";
+import { eq, gte, lte, and, sql, isNotNull } from "drizzle-orm";
 import { db, ordersTable, orderItemsTable, paymentsTable, expensesTable, productsTable, categoriesTable } from "@workspace/db";
 import { GetDailyReportQueryParams, GetProductReportQueryParams } from "@workspace/api-zod";
 
@@ -215,6 +215,50 @@ router.get("/reports/range", async (req, res): Promise<void> => {
     })),
     topProducts,
   });
+});
+
+router.get("/reports/tables", async (req, res): Promise<void> => {
+  const from = String(req.query.from ?? "");
+  const to   = String(req.query.to ?? "");
+
+  let start: Date;
+  let end: Date;
+  if (from && to) {
+    const fd = new Date(from);
+    const td = new Date(to);
+    start = new Date(fd.getFullYear(), fd.getMonth(), fd.getDate(), 0, 0, 0);
+    end   = new Date(td.getFullYear(), td.getMonth(), td.getDate(), 23, 59, 59);
+  } else {
+    const now = new Date();
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    end   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  }
+
+  const orders = await db.select({
+    tableNumber: ordersTable.tableNumber,
+    totalAmount: ordersTable.totalAmount,
+    status:      ordersTable.status,
+  }).from(ordersTable)
+    .where(and(
+      isNotNull(ordersTable.tableNumber),
+      gte(ordersTable.createdAt, start),
+      lte(ordersTable.createdAt, end),
+    ));
+
+  const map = new Map<number, { orderCount: number; revenue: number }>();
+  for (const o of orders) {
+    const tbl = o.tableNumber!;
+    const cur = map.get(tbl) ?? { orderCount: 0, revenue: 0 };
+    cur.orderCount++;
+    if (o.status === "completed") cur.revenue += Number(o.totalAmount);
+    map.set(tbl, cur);
+  }
+
+  const result = Array.from(map.entries())
+    .map(([tableNumber, d]) => ({ tableNumber, ...d }))
+    .sort((a, b) => b.orderCount - a.orderCount);
+
+  res.json(result);
 });
 
 export default router;

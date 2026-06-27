@@ -130,6 +130,8 @@ export interface Order {
   /** @nullable */
   offerId?: number | null;
   source?: string;
+  /** @nullable */
+  tableNumber?: number | null;
   createdAt: string;
   readyTime: string;
   updatedAt?: string;
@@ -190,6 +192,7 @@ export interface OrderInput {
   notes?: string;
   /** @nullable */
   offerId?: number | null;
+  tableNumber?: number;
   items?: OrderItemInput[];
 }
 
@@ -549,8 +552,36 @@ export interface OrderTrackingResult {
   totalAmount: number;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  tableNumber?: number | null;
   createdAt: string;
   items: OrderItem[];
+}
+
+export interface Table {
+  id: number;
+  number: number;
+  status: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ConfigureTablesInput {
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  count: number;
+}
+
+export interface TableStatusUpdate {
+  status: string;
+}
+
+export interface TableReportItem {
+  tableNumber: number;
+  orderCount: number;
+  revenue: number;
 }
 
 export type LookupPublicCustomerParams = {
@@ -600,6 +631,11 @@ to?: string;
 export type GetReportRangeParams = {
 from: string;
 to: string;
+};
+
+export type GetTableReportParams = {
+from?: string;
+to?: string;
 };
 
 export type ListOrderHistoryParams = {

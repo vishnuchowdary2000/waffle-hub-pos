@@ -57,6 +57,7 @@ export const CreatePublicOrderBody = zod.object({
   "orderType": zod.string(),
   "notes": zod.string().optional(),
   "offerId": zod.number().nullish(),
+  "tableNumber": zod.number().optional(),
   "items": zod.array(zod.object({
   "productId": zod.number().nullish(),
   "productName": zod.string().min(1),
@@ -108,6 +109,7 @@ export const TrackPublicOrderResponse = zod.object({
   "status": zod.string(),
   "totalAmount": zod.number(),
   "notes": zod.string().nullish(),
+  "tableNumber": zod.number().nullish(),
   "createdAt": zod.string(),
   "items": zod.array(zod.object({
   "id": zod.number(),
@@ -139,6 +141,7 @@ export const CancelPublicOrderResponse = zod.object({
   "status": zod.string(),
   "totalAmount": zod.number(),
   "notes": zod.string().nullish(),
+  "tableNumber": zod.number().nullish(),
   "createdAt": zod.string(),
   "items": zod.array(zod.object({
   "id": zod.number(),
@@ -186,6 +189,7 @@ export const AddPublicOrderItemsResponse = zod.object({
   "status": zod.string(),
   "totalAmount": zod.number(),
   "notes": zod.string().nullish(),
+  "tableNumber": zod.number().nullish(),
   "createdAt": zod.string(),
   "items": zod.array(zod.object({
   "id": zod.number(),
@@ -349,6 +353,7 @@ export const ListOrdersResponseItem = zod.object({
   "discountAmount": zod.number().optional(),
   "offerId": zod.number().nullish(),
   "source": zod.string().optional(),
+  "tableNumber": zod.number().nullish(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -405,6 +410,7 @@ export const CreateOrderBody = zod.object({
   "orderType": zod.string(),
   "notes": zod.string().optional(),
   "offerId": zod.number().nullish(),
+  "tableNumber": zod.number().optional(),
   "items": zod.array(zod.object({
   "productId": zod.number().nullish(),
   "productName": zod.string().min(1),
@@ -435,6 +441,7 @@ export const GetOrderResponse = zod.object({
   "discountAmount": zod.number().optional(),
   "offerId": zod.number().nullish(),
   "source": zod.string().optional(),
+  "tableNumber": zod.number().nullish(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -505,6 +512,7 @@ export const UpdateOrderResponse = zod.object({
   "discountAmount": zod.number().optional(),
   "offerId": zod.number().nullish(),
   "source": zod.string().optional(),
+  "tableNumber": zod.number().nullish(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -576,6 +584,7 @@ export const UpdateOrderStatusResponse = zod.object({
   "discountAmount": zod.number().optional(),
   "offerId": zod.number().nullish(),
   "source": zod.string().optional(),
+  "tableNumber": zod.number().nullish(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -675,6 +684,7 @@ export const ReplaceOrderItemsResponse = zod.object({
   "discountAmount": zod.number().optional(),
   "offerId": zod.number().nullish(),
   "source": zod.string().optional(),
+  "tableNumber": zod.number().nullish(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -755,6 +765,7 @@ export const AddAddonItemsResponse = zod.object({
   "discountAmount": zod.number().optional(),
   "offerId": zod.number().nullish(),
   "source": zod.string().optional(),
+  "tableNumber": zod.number().nullish(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -952,6 +963,7 @@ export const UpdateSubOrderStatusResponse = zod.object({
   "discountAmount": zod.number().optional(),
   "offerId": zod.number().nullish(),
   "source": zod.string().optional(),
+  "tableNumber": zod.number().nullish(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -1325,6 +1337,7 @@ export const GetDashboardResponse = zod.object({
   "discountAmount": zod.number().optional(),
   "offerId": zod.number().nullish(),
   "source": zod.string().optional(),
+  "tableNumber": zod.number().nullish(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),
@@ -1642,6 +1655,77 @@ export const GetReportRangeResponse = zod.object({
 })
 
 
+/**
+ * @summary List all tables with current status
+ */
+export const ListTablesResponseItem = zod.object({
+  "id": zod.number(),
+  "number": zod.number(),
+  "status": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+export const ListTablesResponse = zod.array(ListTablesResponseItem)
+
+
+/**
+ * @summary Set total number of tables (creates/removes to match count)
+ */
+export const configureTablesBodyCountMin = 0;
+export const configureTablesBodyCountMax = 100;
+
+
+
+export const ConfigureTablesBody = zod.object({
+  "count": zod.number().min(configureTablesBodyCountMin).max(configureTablesBodyCountMax)
+})
+
+export const ConfigureTablesResponseItem = zod.object({
+  "id": zod.number(),
+  "number": zod.number(),
+  "status": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+export const ConfigureTablesResponse = zod.array(ConfigureTablesResponseItem)
+
+
+/**
+ * @summary Update a table's status
+ */
+export const UpdateTableStatusParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateTableStatusBody = zod.object({
+  "status": zod.string()
+})
+
+export const UpdateTableStatusResponse = zod.object({
+  "id": zod.number(),
+  "number": zod.number(),
+  "status": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Orders and revenue grouped by table for a date range
+ */
+export const GetTableReportQueryParams = zod.object({
+  "from": zod.coerce.string().optional(),
+  "to": zod.coerce.string().optional()
+})
+
+export const GetTableReportResponseItem = zod.object({
+  "tableNumber": zod.number(),
+  "orderCount": zod.number(),
+  "revenue": zod.number()
+})
+export const GetTableReportResponse = zod.array(GetTableReportResponseItem)
+
+
 export const ListOrderHistoryQueryParams = zod.object({
   "page": zod.coerce.number().optional(),
   "limit": zod.coerce.number().optional(),
@@ -1664,6 +1748,7 @@ export const ListOrderHistoryResponse = zod.object({
   "discountAmount": zod.number().optional(),
   "offerId": zod.number().nullish(),
   "source": zod.string().optional(),
+  "tableNumber": zod.number().nullish(),
   "createdAt": zod.string(),
   "readyTime": zod.string(),
   "updatedAt": zod.string().optional(),

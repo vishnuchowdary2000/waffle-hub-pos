@@ -28,6 +28,8 @@ export interface Order {
   /** @nullable */
   offerId?: number | null;
   source?: string;
+  /** @nullable */
+  tableNumber?: number | null;
   createdAt: string;
   readyTime: string;
   updatedAt?: string;

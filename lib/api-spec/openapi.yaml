@@ -20,6 +20,7 @@ tags:
   - name: public
   - name: store
   - name: print
+  - name: tables
 
 paths:
   /healthz:
@@ -1300,6 +1301,92 @@ paths:
               schema:
                 $ref: "#/components/schemas/ReportSummary"
 
+  # ── Tables ───────────────────────────────────────────────────────────────────
+  /tables:
+    get:
+      operationId: listTables
+      tags: [tables]
+      summary: List all tables with current status
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Table"
+
+  /tables/configure:
+    post:
+      operationId: configureTables
+      tags: [tables]
+      summary: Set total number of tables (creates/removes to match count)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigureTablesInput"
+      responses:
+        "200":
+          description: Updated table list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Table"
+
+  /tables/{id}/status:
+    patch:
+      operationId: updateTableStatus
+      tags: [tables]
+      summary: Update a table's status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TableStatusUpdate"
+      responses:
+        "200":
+          description: Updated table
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Table"
+
+  /reports/tables:
+    get:
+      operationId: getTableReport
+      tags: [reports]
+      summary: Orders and revenue grouped by table for a date range
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TableReportItem"
+
   /orders/history:
     get:
       operationId: listOrderHistory
@@ -1412,6 +1499,7 @@ components:
         discountAmount: { type: number }
         offerId:        { type: ["integer", "null"] }
         source:         { type: string }
+        tableNumber:    { type: ["integer", "null"] }
         createdAt:    { type: string }
         readyTime:    { type: string }
         updatedAt:    { type: string }
@@ -1474,6 +1562,7 @@ components:
         orderType:     { type: string }
         notes:         { type: string }
         offerId:       { type: ["integer", "null"] }
+        tableNumber:   { type: integer }
         items:
           type: array
           items:
@@ -1964,8 +2053,40 @@ components:
         status:        { type: string }
         totalAmount:   { type: number }
         notes:         { type: ["string", "null"] }
+        tableNumber:   { type: ["integer", "null"] }
         createdAt:     { type: string }
         items:
           type: array
           items:
             $ref: "#/components/schemas/OrderItem"
+
+    # ── Tables ─────────────────────────────────────────────────────────────────
+    Table:
+      type: object
+      required: [id, number, status, createdAt]
+      properties:
+        id:        { type: integer }
+        number:    { type: integer }
+        status:    { type: string }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+
+    ConfigureTablesInput:
+      type: object
+      required: [count]
+      properties:
+        count: { type: integer, minimum: 0, maximum: 100 }
+
+    TableStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+
+    TableReportItem:
+      type: object
+      required: [tableNumber, orderCount, revenue]
+      properties:
+        tableNumber: { type: integer }
+        orderCount:  { type: integer }
+        revenue:     { type: number }

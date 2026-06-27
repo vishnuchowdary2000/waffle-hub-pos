@@ -17,6 +17,7 @@ export const ordersTable = pgTable("orders", {
   discountAmount:  numeric("discount_amount",  { precision: 10, scale: 2 }).notNull().default("0"),
   offerId:         integer("offer_id"),
   source:          text("source").notNull().default("counter"), // 'counter' | 'customer'
+  tableNumber:     integer("table_number"),
   readyTime: timestamp("ready_time", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

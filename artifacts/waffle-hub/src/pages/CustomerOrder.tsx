@@ -44,6 +44,12 @@ export default function CustomerOrder() {
   const [, navigate] = useLocation();
   const [step, setStep] = useState<Step>("info");
 
+  // Table number from QR URL param (?table=N)
+  const tableNumber = (() => {
+    const p = new URLSearchParams(window.location.search).get("table");
+    return p ? parseInt(p, 10) || null : null;
+  })();
+
   // Customer info
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -202,6 +208,7 @@ export default function CustomerOrder() {
           customerId: customerProfile?.id,
           orderType: derivedOrderType(),
           notes: notes.trim() || undefined,
+          tableNumber: tableNumber ?? undefined,
           items: cart.map(c => ({
             productId: c.productId,
             productName: c.productName,
@@ -234,7 +241,10 @@ export default function CustomerOrder() {
             </div>
             <div>
               <p className="font-bold text-foreground text-sm leading-tight">The Waffle Hub</p>
-              <p className="text-xs text-muted-foreground">Self Order</p>
+              {tableNumber != null
+                ? <p className="text-xs font-black text-amber-400">🪑 Table {tableNumber}</p>
+                : <p className="text-xs text-muted-foreground">Self Order</p>
+              }
             </div>
           </div>
           <div className="flex items-center gap-2">

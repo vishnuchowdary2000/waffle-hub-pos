@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, or, ilike, gte, lte, sql } from "drizzle-orm";
-import { db, ordersTable, orderItemsTable, paymentsTable, customersTable, subOrdersTable, offersTable } from "@workspace/db";
+import { db, ordersTable, orderItemsTable, paymentsTable, customersTable, subOrdersTable, offersTable, tablesTable } from "@workspace/db";
 import { computeOfferDiscount } from "./offers";
 import {
   CreateOrderBody,
@@ -228,6 +228,8 @@ router.post("/orders", async (req, res): Promise<void> => {
   }
 
   // Insert with temp order number; update to sequential ORD-XXXX after getting id
+  const tableNumber = (parsed.data as { tableNumber?: number }).tableNumber ?? null;
+
   const [order] = await db.insert(ordersTable).values({
     orderNumber: `TMP-${Date.now()}`,
     customerId,
@@ -237,8 +239,16 @@ router.post("/orders", async (req, res): Promise<void> => {
     status: "pending_payment",
     notes: parsed.data.notes ?? null,
     totalAmount: "0",
+    tableNumber,
     readyTime,
   }).returning();
+
+  // Mark table occupied when an order is linked to it
+  if (tableNumber) {
+    await db.update(tablesTable)
+      .set({ status: "occupied" })
+      .where(eq(tablesTable.number, tableNumber));
+  }
 
   // Sequential order number: ORD-0001, ORD-0002...
   const orderNumber = `ORD-${String(order.id).padStart(4, "0")}`;

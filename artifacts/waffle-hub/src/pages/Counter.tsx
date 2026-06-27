@@ -40,6 +40,7 @@ type NotifOrder = {
   orderNumber: string;
   customerName: string;
   totalAmount: number;
+  tableNumber?: number | null;
   items: { productName: string; quantity: number }[];
 };
 
@@ -170,6 +171,7 @@ export default function Counter() {
           orderNumber: o.orderNumber,
           customerName: o.customerName,
           totalAmount: o.totalAmount,
+          tableNumber: (o as { tableNumber?: number | null }).tableNumber ?? null,
           items: o.items.map(i => ({ productName: i.productName, quantity: i.quantity })),
         })),
         ...prev,
@@ -347,11 +349,16 @@ export default function Counter() {
           {notifOrders.map(order => (
             <div key={order.id} className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 space-y-2">
               <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0 flex-wrap">
                   <QrCode size={14} className="text-amber-400 shrink-0" />
                   <span className="text-sm font-semibold text-amber-300 truncate">
                     #{order.orderNumber} · {order.customerName || "Guest"}
                   </span>
+                  {order.tableNumber != null && (
+                    <span className="text-xs font-black bg-amber-500 text-black px-2 py-0.5 rounded-full shrink-0">
+                      🪑 Table {order.tableNumber}
+                    </span>
+                  )}
                 </div>
                 <span className="text-sm font-bold text-amber-400 shrink-0">{formatCurrency(order.totalAmount)}</span>
               </div>

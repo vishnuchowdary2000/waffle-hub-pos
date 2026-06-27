@@ -18,6 +18,8 @@ export interface OrderTrackingResult {
   totalAmount: number;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  tableNumber?: number | null;
   createdAt: string;
   items: OrderItem[];
 }

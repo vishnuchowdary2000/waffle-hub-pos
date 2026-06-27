@@ -17,6 +17,9 @@ import {
   useCreateStoreAnnouncement,
   useUpdateStoreAnnouncement,
   useDeleteStoreAnnouncement,
+  useListTables,
+  useConfigureTables,
+  useUpdateTableStatus,
   getListCustomersQueryKey,
   getListExpensesQueryKey,
   getGetDailyReportQueryKey,
@@ -24,6 +27,7 @@ import {
   getListUsersQueryKey,
   getGetStoreSettingsQueryKey,
   getListStoreAnnouncementsQueryKey,
+  getListTablesQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -35,11 +39,11 @@ import {
   TrendingUp, TrendingDown, ShieldCheck,
   UserCog, KeyRound, ToggleLeft, ToggleRight, ChefHat, ShoppingBag,
   Store, Megaphone, Clock, Check, Pencil, Phone,
-  Printer, MapPin, FileText,
+  Printer, MapPin, FileText, LayoutGrid, QrCode, Download,
 } from "lucide-react";
 import { type PaperSize, triggerBrowserPrint, generateReceiptHTML } from "@/lib/printService";
 
-type Tab = "customers" | "expenses" | "reports" | "users" | "store";
+type Tab = "customers" | "expenses" | "reports" | "users" | "store" | "tables";
 
 const ROLE_META: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   admin:   { label: "Admin",   color: "text-amber-400 bg-amber-500/10 border-amber-500/30",   icon: ShieldCheck },
@@ -70,6 +74,7 @@ export default function Admin() {
             { key: "expenses",  label: "Expenses",  icon: Receipt },
             { key: "reports",   label: "Reports",   icon: BarChart3 },
             { key: "store",     label: "Store",     icon: Store },
+            { key: "tables",    label: "Tables",    icon: LayoutGrid },
           ] as { key: Tab; label: string; icon: React.ElementType }[]).map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -94,6 +99,7 @@ export default function Admin() {
         {tab === "expenses"  && <ExpensesTab />}
         {tab === "reports"   && <ReportsTab />}
         {tab === "store"     && <StoreTab />}
+        {tab === "tables"    && <TablesTab />}
       </div>
     </div>
   );
@@ -1290,6 +1296,162 @@ function MetricCard({ label, value, color = "text-foreground" }: { label: string
     <div className="bg-card border border-card-border rounded-xl p-4">
       <p className="text-xs text-muted-foreground mb-1">{label}</p>
       <p className={cn("text-xl font-bold", color)}>{value}</p>
+    </div>
+  );
+}
+
+/* ── Tables Tab ─────────────────────────────────────────────────────────────── */
+
+const TABLE_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  available: { label: "Available", color: "text-green-400 bg-green-500/10 border-green-500/30" },
+  occupied:  { label: "Occupied",  color: "text-amber-400 bg-amber-500/10 border-amber-500/30" },
+  cleaning:  { label: "Cleaning",  color: "text-blue-400 bg-blue-500/10 border-blue-500/30"   },
+};
+
+function TablesTab() {
+  const qc = useQueryClient();
+  const [count, setCount] = useState("");
+
+  const { data: tables = [], isLoading } = useListTables(
+    { query: { queryKey: getListTablesQueryKey() } }
+  );
+  const configure   = useConfigureTables();
+  const updateStatus = useUpdateTableStatus();
+
+  const baseUrl = `${window.location.protocol}//${window.location.host}`;
+
+  const handleConfigure = async () => {
+    const n = parseInt(count, 10);
+    if (!n || n < 1 || n > 200) return;
+    await configure.mutateAsync({ data: { count: n } });
+    qc.invalidateQueries({ queryKey: getListTablesQueryKey() });
+    setCount("");
+  };
+
+  const handleStatus = async (id: number, status: string) => {
+    await updateStatus.mutateAsync({ id, data: { status } });
+    qc.invalidateQueries({ queryKey: getListTablesQueryKey() });
+  };
+
+  const viewQR = (num: number) => {
+    const orderUrl = `${baseUrl}/order?table=${num}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(orderUrl)}&margin=10`;
+    window.open(qrUrl, "_blank");
+  };
+
+  return (
+    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+      <div>
+        <h2 className="text-lg font-bold text-foreground">Table Management</h2>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Configure tables and generate QR codes for customer self-ordering
+        </p>
+      </div>
+
+      {/* Configure count */}
+      <div className="bg-card border border-card-border rounded-xl p-5 space-y-4">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <LayoutGrid size={15} className="text-primary" />
+          Configure Table Count
+        </h3>
+        <div className="flex gap-3 items-end">
+          <div className="flex-1">
+            <label className="text-xs text-muted-foreground mb-1.5 block">Number of tables</label>
+            <input
+              type="number"
+              min={1}
+              max={200}
+              value={count}
+              onChange={e => setCount(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleConfigure()}
+              placeholder={tables.length > 0 ? `Currently ${tables.length} tables` : "e.g. 10"}
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <button
+            onClick={handleConfigure}
+            disabled={configure.isPending || !count}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-bold hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-2"
+          >
+            {configure.isPending
+              ? <RefreshCw size={14} className="animate-spin" />
+              : <Check size={14} />}
+            Apply
+          </button>
+        </div>
+        {tables.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            Increasing the count adds new tables; decreasing marks extras inactive.
+          </p>
+        )}
+      </div>
+
+      {/* Tables grid */}
+      {isLoading ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <RefreshCw size={20} className="animate-spin mx-auto mb-3" />
+          <p className="text-sm">Loading tables…</p>
+        </div>
+      ) : tables.length === 0 ? (
+        <div className="text-center py-14 text-muted-foreground border border-dashed border-border rounded-xl">
+          <LayoutGrid size={36} className="mx-auto mb-3 opacity-30" />
+          <p className="text-sm font-medium">No tables configured yet</p>
+          <p className="text-xs mt-1 opacity-70">Enter a count above and click Apply to create tables</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {tables.map(table => {
+            const cfg = TABLE_STATUS_CONFIG[table.status] ?? TABLE_STATUS_CONFIG["available"];
+            const orderUrl = `${baseUrl}/order?table=${table.number}`;
+            const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(orderUrl)}&margin=6`;
+            return (
+              <div key={table.id} className="bg-card border border-card-border rounded-xl p-4 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-foreground">Table {table.number}</span>
+                  <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full border", cfg.color)}>
+                    {cfg.label}
+                  </span>
+                </div>
+
+                <div className="flex justify-center">
+                  <img
+                    src={qrSrc}
+                    alt={`QR Table ${table.number}`}
+                    className="w-28 h-28 rounded-lg bg-white p-1"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-1">
+                  {(["available", "occupied", "cleaning"] as const).map(s => (
+                    <button
+                      key={s}
+                      onClick={() => handleStatus(table.id, s)}
+                      disabled={table.status === s || updateStatus.isPending}
+                      className={cn(
+                        "text-xs py-1 rounded-lg font-medium transition-colors",
+                        table.status === s
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-muted-foreground hover:bg-secondary/80"
+                      )}
+                    >
+                      {s === "available" ? "Free" : s === "occupied" ? "Busy" : "Clean"}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => viewQR(table.number)}
+                  className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg py-1.5 transition-colors"
+                >
+                  <QrCode size={11} />
+                  <Download size={11} />
+                  View / Save QR
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

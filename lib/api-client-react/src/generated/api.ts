@@ -25,6 +25,7 @@ import type {
   Category,
   CategoryInput,
   CategoryUpdate,
+  ConfigureTablesInput,
   Customer,
   CustomerInput,
   CustomerUpdate,
@@ -36,6 +37,7 @@ import type {
   GetDailyReportParams,
   GetProductReportParams,
   GetReportRangeParams,
+  GetTableReportParams,
   HealthStatus,
   ListCustomersParams,
   ListExpensesParams,
@@ -77,6 +79,9 @@ import type {
   StoreSettings,
   StoreSettingsInput,
   StoreStatus,
+  Table,
+  TableReportItem,
+  TableStatusUpdate,
   User,
   UserInput,
   UserUpdate
@@ -4818,6 +4823,310 @@ export function useGetReportRange<TData = Awaited<ReturnType<typeof getReportRan
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetReportRangeQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListTablesUrl = () => {
+
+
+
+
+  return `/api/tables`
+}
+
+/**
+ * @summary List all tables with current status
+ */
+export const listTables = async ( options?: RequestInit): Promise<Table[]> => {
+
+  return customFetch<Table[]>(getListTablesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTablesQueryKey = () => {
+    return [
+    `/api/tables`
+    ] as const;
+    }
+
+
+export const getListTablesQueryOptions = <TData = Awaited<ReturnType<typeof listTables>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTables>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTablesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTables>>> = ({ signal }) => listTables({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTables>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTablesQueryResult = NonNullable<Awaited<ReturnType<typeof listTables>>>
+export type ListTablesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all tables with current status
+ */
+
+export function useListTables<TData = Awaited<ReturnType<typeof listTables>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTables>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTablesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getConfigureTablesUrl = () => {
+
+
+
+
+  return `/api/tables/configure`
+}
+
+/**
+ * @summary Set total number of tables (creates/removes to match count)
+ */
+export const configureTables = async (configureTablesInput: ConfigureTablesInput, options?: RequestInit): Promise<Table[]> => {
+
+  return customFetch<Table[]>(getConfigureTablesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      configureTablesInput,)
+  }
+);}
+
+
+
+
+export const getConfigureTablesMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof configureTables>>, TError,{data: BodyType<ConfigureTablesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof configureTables>>, TError,{data: BodyType<ConfigureTablesInput>}, TContext> => {
+
+const mutationKey = ['configureTables'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof configureTables>>, {data: BodyType<ConfigureTablesInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  configureTables(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfigureTablesMutationResult = NonNullable<Awaited<ReturnType<typeof configureTables>>>
+    export type ConfigureTablesMutationBody = BodyType<ConfigureTablesInput>
+    export type ConfigureTablesMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Set total number of tables (creates/removes to match count)
+ */
+export const useConfigureTables = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof configureTables>>, TError,{data: BodyType<ConfigureTablesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof configureTables>>,
+        TError,
+        {data: BodyType<ConfigureTablesInput>},
+        TContext
+      > => {
+      return useMutation(getConfigureTablesMutationOptions(options));
+    }
+
+export const getUpdateTableStatusUrl = (id: number,) => {
+
+
+
+
+  return `/api/tables/${id}/status`
+}
+
+/**
+ * @summary Update a table's status
+ */
+export const updateTableStatus = async (id: number,
+    tableStatusUpdate: TableStatusUpdate, options?: RequestInit): Promise<Table> => {
+
+  return customFetch<Table>(getUpdateTableStatusUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      tableStatusUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateTableStatusMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTableStatus>>, TError,{id: number;data: BodyType<TableStatusUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTableStatus>>, TError,{id: number;data: BodyType<TableStatusUpdate>}, TContext> => {
+
+const mutationKey = ['updateTableStatus'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTableStatus>>, {id: number;data: BodyType<TableStatusUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateTableStatus(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTableStatusMutationResult = NonNullable<Awaited<ReturnType<typeof updateTableStatus>>>
+    export type UpdateTableStatusMutationBody = BodyType<TableStatusUpdate>
+    export type UpdateTableStatusMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a table's status
+ */
+export const useUpdateTableStatus = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTableStatus>>, TError,{id: number;data: BodyType<TableStatusUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTableStatus>>,
+        TError,
+        {id: number;data: BodyType<TableStatusUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateTableStatusMutationOptions(options));
+    }
+
+export const getGetTableReportUrl = (params?: GetTableReportParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/reports/tables?${stringifiedParams}` : `/api/reports/tables`
+}
+
+/**
+ * @summary Orders and revenue grouped by table for a date range
+ */
+export const getTableReport = async (params?: GetTableReportParams, options?: RequestInit): Promise<TableReportItem[]> => {
+
+  return customFetch<TableReportItem[]>(getGetTableReportUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTableReportQueryKey = (params?: GetTableReportParams,) => {
+    return [
+    `/api/reports/tables`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetTableReportQueryOptions = <TData = Awaited<ReturnType<typeof getTableReport>>, TError = ErrorType<unknown>>(params?: GetTableReportParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTableReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTableReportQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTableReport>>> = ({ signal }) => getTableReport(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTableReport>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTableReportQueryResult = NonNullable<Awaited<ReturnType<typeof getTableReport>>>
+export type GetTableReportQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Orders and revenue grouped by table for a date range
+ */
+
+export function useGetTableReport<TData = Awaited<ReturnType<typeof getTableReport>>, TError = ErrorType<unknown>>(
+ params?: GetTableReportParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTableReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTableReportQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

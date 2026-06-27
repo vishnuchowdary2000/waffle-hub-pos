@@ -1,3 +1,4 @@
 - [Session persistence setup](session-persistence.md) — connect-pg-simple session table must be created manually; createTableIfMissing silently fails; causes all auth routes to return 403.
 - [OpenAPI + Orval codegen workflow](orval-codegen.md) — always edit spec first, run codegen, then write server+frontend; codegen cleans output folder so never hand-write generated files.
 - [Drizzle groupBy with COALESCE](drizzle-coalesce-groupby.md) — use sql template for COALESCE in both SELECT and groupBy to avoid Drizzle type errors with nullable columns.
+- [Table API type shape](table-type-shape.md) — generated `Table` type uses `number` (not `tableNumber`) for the column; `TableReportItem` uses `orderCount`/`revenue` (no `avgOrderValue`).
