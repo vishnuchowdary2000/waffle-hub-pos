@@ -1,0 +1,290 @@
+ADMIN REPORTS & DASHBOARD IMPROVEMENT
+
+IMPORTANT:
+
+Do not mark this task complete until all test cases pass.
+
+Implement feature first.
+Then run all test scenarios below.
+Fix any failures before considering the task complete.
+
+---
+
+REPORTS SECTION
+
+Add a Reports section in Admin.
+
+REPORT FILTERS
+
+1. Today
+
+2. Particular Date
+
+3. Date Range
+
+From Date
+To Date
+
+4. Monthly
+
+5. Last 6 Months
+
+6. Last 12 Months
+
+---
+
+REPORT METRICS
+
+Show:
+
+* Total Orders
+* Completed Orders
+* Pending Orders
+* Cancelled Orders
+* Revenue
+* Expenses
+* Net Revenue
+* Average Order Value
+
+---
+
+ORDER BREAKDOWN
+
+Show:
+
+* Dine In Orders
+* Takeaway Orders
+* Mixed Orders
+
+---
+
+TOP SELLING ITEMS
+
+Show:
+
+* Top 10 Selling Items
+* Quantity Sold
+* Revenue Generated
+
+---
+
+CATEGORY PERFORMANCE
+
+Show:
+
+* Pocket Waffles
+* Biscuit Waffles
+* Beverages
+* Other Categories
+
+---
+
+EXPORT
+
+Add:
+
+* Export CSV
+* Export Excel
+
+---
+
+DASHBOARD IMPROVEMENT
+
+Current Problem:
+
+Dashboard shows limited orders.
+
+Required:
+
+Admin should be able to scroll through all historical orders.
+
+Use:
+
+* Pagination
+  OR
+* Infinite Scroll
+
+---
+
+ORDER LIST DETAILS
+
+Show:
+
+* Order Number
+* Customer Name
+* Mobile Number
+* Order Type
+* Order Amount
+* Payment Status
+* Order Status
+* Created Time
+
+---
+
+SEARCH
+
+Search by:
+
+* Order Number
+* Customer Name
+* Mobile Number
+
+---
+
+ACCESS CONTROL
+
+Admin:
+Can see reports and revenue.
+
+Counter:
+Cannot see reports.
+
+Kitchen:
+Cannot see reports.
+
+---
+
+SELF TESTING REQUIRED
+
+Run these tests before marking task complete.
+
+---
+
+TEST 1 - TODAY REPORT
+
+Create test orders.
+
+Verify:
+
+Today's report shows correct:
+
+* Order Count
+* Revenue
+* Expenses
+
+---
+
+TEST 2 - PARTICULAR DATE
+
+Select a date.
+
+Verify:
+
+Only orders from that date appear.
+
+---
+
+TEST 3 - DATE RANGE
+
+Select:
+
+From Date
+To Date
+
+Verify:
+
+Only orders within range appear.
+
+---
+
+TEST 4 - MONTHLY REPORT
+
+Verify:
+
+Monthly totals equal sum of orders within month.
+
+---
+
+TEST 5 - LAST 6 MONTHS
+
+Verify:
+
+Data loads correctly.
+
+No empty calculations.
+
+---
+
+TEST 6 - LAST 12 MONTHS
+
+Verify:
+
+Data loads correctly.
+
+---
+
+TEST 7 - TOP SELLING ITEMS
+
+Create sample sales.
+
+Verify:
+
+Items rank correctly by quantity sold.
+
+---
+
+TEST 8 - CATEGORY PERFORMANCE
+
+Verify:
+
+Pocket Waffles count is correct.
+
+Biscuit Waffles count is correct.
+
+---
+
+TEST 9 - EXPORT CSV
+
+Export file.
+
+Open exported file.
+
+Verify values match report.
+
+---
+
+TEST 10 - EXPORT EXCEL
+
+Export file.
+
+Open exported file.
+
+Verify values match report.
+
+---
+
+TEST 11 - SEARCH
+
+Search by:
+
+* Order Number
+* Customer Name
+* Mobile Number
+
+Verify correct records are returned.
+
+---
+
+TEST 12 - ROLE SECURITY
+
+Admin:
+Can access reports.
+
+Counter:
+Cannot access reports.
+
+Kitchen:
+Cannot access reports.
+
+---
+
+FINAL REQUIREMENT
+
+Before marking task complete provide:
+
+1. Files Modified
+2. Database Changes
+3. Test Results
+4. Any Known Limitations
+
+Do not mark complete until all tests pass.
