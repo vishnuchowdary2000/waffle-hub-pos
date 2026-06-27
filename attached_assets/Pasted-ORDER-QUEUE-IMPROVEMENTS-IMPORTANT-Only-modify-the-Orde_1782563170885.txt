@@ -1,0 +1,231 @@
+ORDER QUEUE IMPROVEMENTS
+
+IMPORTANT
+
+Only modify the Order Queue and Admin customer management.
+
+Do NOT change the Counter order creation workflow except for removing Kitchen unpaid orders from the Counter screen.
+
+Do NOT modify Kitchen workflow.
+
+---
+
+1. PENDING AMOUNT ON ORDER CARD
+
+Current Problem:
+
+If a customer pays partially:
+
+Bill = ₹100
+
+Customer pays ₹50
+
+Pending = ₹50
+
+The Order Queue card does not display the pending amount correctly.
+
+Required:
+
+Display on every Order Queue card:
+
+* Total Amount
+* Amount Paid
+* Pending Amount
+
+Update immediately after every payment.
+
+---
+
+2. PENDING AMOUNT AFTER ORDER MODIFICATION
+
+Example:
+
+Original Bill = ₹100
+
+Paid = ₹50
+
+Pending = ₹50
+
+Customer adds items worth ₹80
+
+New Total = ₹180
+
+Paid = ₹50
+
+Pending must automatically become ₹130.
+
+Whenever items are added, removed or edited, recalculate:
+
+* Total
+* Paid
+* Pending
+
+---
+
+3. ORDER ADDITIONS
+
+When staff adds items to an existing order:
+
+* Do not create a new order.
+* Merge into the existing order.
+* Update totals correctly.
+
+---
+
+4. CUSTOMER SEARCH
+
+Add a search bar in the Order Queue.
+
+Search by:
+
+* Customer Name
+* Mobile Number
+* Order Number
+
+Results should update while typing.
+
+---
+
+5. EDIT CUSTOMER DETAILS
+
+Current Problem:
+
+Sometimes customers provide the wrong name or mobile number while placing an order.
+
+Required:
+
+Allow editing customer details from:
+
+* Order Queue
+* Admin
+
+Editable fields:
+
+* Customer Name
+* Mobile Number
+
+When updated:
+
+* Existing order should reflect the new details immediately.
+* Customer database should also update.
+* Future searches should work using the updated mobile number and customer name.
+
+Do not create a duplicate customer record if the mobile number is corrected.
+
+---
+
+6. COUNTER CLEANUP
+
+Kitchen unpaid orders should not appear in the Counter order creation screen.
+
+They should only be managed from the Order Queue.
+
+Do not change any other Counter functionality.
+
+---
+
+SELF TEST
+
+TEST 1
+
+Create order.
+
+Bill = ₹100
+
+Pay ₹50.
+
+Verify:
+
+Total = ₹100
+
+Paid = ₹50
+
+Pending = ₹50
+
+---
+
+TEST 2
+
+Add item worth ₹80.
+
+Verify:
+
+Total = ₹180
+
+Paid = ₹50
+
+Pending = ₹130
+
+---
+
+TEST 3
+
+Edit customer name.
+
+Verify:
+
+Order Queue updates immediately.
+
+Admin updates immediately.
+
+Search works with new name.
+
+---
+
+TEST 4
+
+Edit customer mobile number.
+
+Verify:
+
+Order Queue updates immediately.
+
+Admin updates immediately.
+
+Search works with new mobile number.
+
+No duplicate customer record is created.
+
+---
+
+TEST 5
+
+Search using:
+
+* Customer Name
+* Mobile Number
+* Order Number
+
+Verify correct order is returned.
+
+---
+
+TEST 6
+
+Refresh all pages.
+
+Verify:
+
+* Customer details persist.
+* Pending amount persists.
+* Search continues to work.
+
+---
+
+TEST 7
+
+Verify Kitchen unpaid orders no longer appear in the Counter screen.
+
+Verify they remain available in the Order Queue.
+
+---
+
+FINAL REQUIREMENT
+
+Before marking the task complete provide:
+
+1. Files modified.
+2. Database changes (if any).
+3. Confirmation that every self-test passed.
+
+Do not mark this task complete until all tests pass.

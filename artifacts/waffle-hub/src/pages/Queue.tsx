@@ -31,6 +31,7 @@ import {
   UtensilsCrossed,
   X,
   CheckCircle,
+  UserRound,
 } from "lucide-react";
 import EditOrderModal from "./EditOrderModal";
 
@@ -97,12 +98,14 @@ export default function Queue() {
   const [confirmCancel, setConfirmCancel] = useState<number | null>(null);
   const [editOrderId, setEditOrderId] = useState<number | null>(null);
   const [addonOrderId, setAddonOrderId] = useState<number | null>(null);
+  const [editCustomerOrderId, setEditCustomerOrderId] = useState<number | null>(null);
+  const [queueSearch, setQueueSearch] = useState("");
 
   const { data: orders = [], isLoading, dataUpdatedAt } = useListOrders(
-    { status: ACTIVE_STATUSES },
+    { status: ACTIVE_STATUSES, search: queueSearch || undefined },
     {
       query: {
-        queryKey: getListOrdersQueryKey({ status: ACTIVE_STATUSES }),
+        queryKey: getListOrdersQueryKey({ status: ACTIVE_STATUSES, search: queueSearch || undefined }),
         refetchInterval: 5000,
       },
     }
@@ -208,6 +211,26 @@ export default function Queue() {
             })}
           </div>
         </div>
+
+        {/* Search bar */}
+        <div className="mt-3 relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search by customer name, phone or order number…"
+            value={queueSearch}
+            onChange={e => setQueueSearch(e.target.value)}
+            className="w-full bg-secondary border border-border rounded-lg pl-9 pr-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          {queueSearch && (
+            <button
+              onClick={() => setQueueSearch("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Order list */}
@@ -301,11 +324,29 @@ export default function Queue() {
                       </div>
                     </div>
 
-                    {/* Total */}
-                    <div className="text-right shrink-0">
-                      <p className="font-bold text-primary">{formatCurrency(order.totalAmount)}</p>
-                      {isUnpaid && order.status !== "pending_payment" && (
-                        <span className="text-xs text-amber-400 font-medium">Unpaid</span>
+                    {/* Payment summary */}
+                    <div className="text-right shrink-0 space-y-0.5 min-w-[72px]">
+                      <p className="font-bold text-primary">
+                        {formatCurrency(order.payment?.finalAmount ?? order.totalAmount)}
+                      </p>
+                      {order.payment ? (
+                        <>
+                          <p className="text-xs text-muted-foreground">
+                            Paid:{" "}
+                            <span className={order.payment.totalPaid > 0 ? "text-green-400 font-semibold" : ""}>
+                              {formatCurrency(order.payment.totalPaid)}
+                            </span>
+                          </p>
+                          {order.payment.balance > 0 && (
+                            <p className="text-xs text-amber-400 font-semibold">
+                              Due: {formatCurrency(order.payment.balance)}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        order.status !== "pending_payment" && (
+                          <span className="text-xs text-amber-400 font-medium">Unpaid</span>
+                        )
                       )}
                     </div>
                   </div>
@@ -382,6 +423,16 @@ export default function Queue() {
                       </button>
                     )}
 
+                    {/* Edit Customer — available on all active orders */}
+                    <button
+                      onClick={() => setEditCustomerOrderId(order.id)}
+                      disabled={isBusy}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground border border-border rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+                    >
+                      <UserRound size={13} />
+                      Customer
+                    </button>
+
                     {/* Mark Complete (ready orders) */}
                     {order.status === "ready" && (
                       <button
@@ -424,6 +475,21 @@ export default function Queue() {
           <EditOrderModal
             order={editOrder}
             onClose={() => setEditOrderId(null)}
+          />
+        ) : null;
+      })()}
+
+      {/* Edit Customer modal */}
+      {editCustomerOrderId !== null && (() => {
+        const ecOrder = orders.find(o => o.id === editCustomerOrderId);
+        return ecOrder ? (
+          <EditCustomerModal
+            order={ecOrder}
+            onClose={() => setEditCustomerOrderId(null)}
+            onSuccess={() => {
+              setEditCustomerOrderId(null);
+              void qc.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+            }}
           />
         ) : null;
       })()}
@@ -768,6 +834,93 @@ function AddItemsModal({
               : cartCount > 0
               ? `Send ${cartCount} Item${cartCount !== 1 ? "s" : ""} to Kitchen →`
               : "Select items to add"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditCustomerModal({
+  order,
+  onClose,
+  onSuccess,
+}: {
+  order: QueueOrder;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [name, setName] = useState(order.customerName);
+  const [phone, setPhone] = useState(order.customerPhone ?? "");
+  const [error, setError] = useState("");
+  const updateOrder = useUpdateOrder();
+
+  const handleSave = () => {
+    if (!name.trim()) { setError("Name is required."); return; }
+    setError("");
+    updateOrder.mutate(
+      {
+        id: order.id,
+        data: {
+          customerName: name.trim(),
+          customerPhone: phone.trim() || undefined,
+        },
+      },
+      {
+        onSuccess: () => onSuccess(),
+        onError: () => setError("Failed to update. Please try again."),
+      }
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+      <div className="bg-card border border-card-border rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-foreground flex items-center gap-2">
+            <UserRound size={16} className="text-primary" />
+            Edit Customer
+          </h3>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-secondary text-muted-foreground">
+            <X size={15} />
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground font-mono">{order.orderNumber}</p>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Customer Name *</label>
+            <input
+              value={name}
+              onChange={e => setName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleSave()}
+              className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Mobile Number</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleSave()}
+              className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+        </div>
+        {error && <p className="text-xs text-destructive">{error}</p>}
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl bg-secondary text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={updateOrder.isPending}
+            className="flex-[2] py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-all"
+          >
+            {updateOrder.isPending ? "Saving…" : "Save"}
           </button>
         </div>
       </div>

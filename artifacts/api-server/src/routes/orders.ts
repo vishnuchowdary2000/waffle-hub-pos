@@ -313,8 +313,37 @@ router.patch("/orders/:id", async (req, res): Promise<void> => {
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
   const parsed = UpdateOrderBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+
+  // Fetch pre-update order for customer sync comparison
+  const [pre] = await db.select().from(ordersTable).where(eq(ordersTable.id, params.data.id));
+  if (!pre) { res.status(404).json({ error: "Order not found" }); return; }
+
   const [row] = await db.update(ordersTable).set(parsed.data).where(eq(ordersTable.id, params.data.id)).returning();
   if (!row) { res.status(404).json({ error: "Order not found" }); return; }
+
+  // Sync customer record when name or phone changes
+  const newName  = parsed.data.customerName;
+  const newPhone = parsed.data.customerPhone;
+  if ((newName || newPhone) && pre.customerId) {
+    if (newPhone && newPhone !== pre.customerPhone) {
+      // Phone changed — check if another customer already has that number
+      const [existing] = await db.select().from(customersTable).where(eq(customersTable.phone, newPhone));
+      if (existing && existing.id !== pre.customerId) {
+        // Re-point the order to the existing customer (no duplicate created)
+        if (newName) await db.update(customersTable).set({ name: newName }).where(eq(customersTable.id, existing.id));
+        await db.update(ordersTable).set({ customerId: existing.id }).where(eq(ordersTable.id, row.id));
+      } else {
+        // Update current customer's phone and optionally name
+        const upd: { phone: string; name?: string } = { phone: newPhone };
+        if (newName) upd.name = newName;
+        await db.update(customersTable).set(upd).where(eq(customersTable.id, pre.customerId));
+      }
+    } else if (newName && newName !== pre.customerName) {
+      // Only name changed — update customer name
+      await db.update(customersTable).set({ name: newName }).where(eq(customersTable.id, pre.customerId));
+    }
+  }
+
   const full = await getFullOrder(row.id);
   res.json(full);
 });

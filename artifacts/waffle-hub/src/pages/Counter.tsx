@@ -163,7 +163,11 @@ export default function Counter() {
   );
 
   useEffect(() => {
-    const newOnes = qrOrders.filter(o => !seenIdsRef.current.has(o.id));
+    // Exclude orders that already have a payment record — those are partially-paid
+    // orders that should only be managed from the Order Queue, not Counter.
+    const newOnes = qrOrders
+      .filter(o => !seenIdsRef.current.has(o.id))
+      .filter(o => !o.payment);
     if (newOnes.length > 0) {
       setNotifOrders(prev => [
         ...newOnes.map(o => ({
@@ -179,6 +183,9 @@ export default function Counter() {
       if (initializedRef.current && soundEnabledRef.current) playChime();
       newOnes.forEach(o => seenIdsRef.current.add(o.id));
     }
+    // Mark seen for ALL qrOrders (including payment-bearing ones) so they don't
+    // re-surface if payment is reversed/voided.
+    qrOrders.forEach(o => seenIdsRef.current.add(o.id));
     if (!initializedRef.current) initializedRef.current = true;
   }, [qrOrders]);
 

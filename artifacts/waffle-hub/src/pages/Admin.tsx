@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   useListCustomers,
   useDeleteCustomer,
+  useUpdateCustomer,
   useListExpenses,
   useCreateExpense,
   useDeleteExpense,
@@ -113,12 +114,17 @@ function CustomersTab() {
   const [confirmId, setConfirmId] = useState<number | null>(null);
   const [confirmBulk, setConfirmBulk] = useState(false);
   const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
+  const [editCustomer, setEditCustomer] = useState<{ id: number; name: string; phone: string } | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editError, setEditError] = useState("");
 
   const { data: customers = [], isLoading } = useListCustomers(
     { search: search || undefined },
     { query: { queryKey: getListCustomersQueryKey({ search: search || undefined }) } }
   );
   const deleteCustomer = useDeleteCustomer();
+  const updateCustomer = useUpdateCustomer();
 
   const zeroOrderCustomers = customers.filter(c => c.orderCount === 0);
   const confirmCustomer = customers.find(c => c.id === confirmId);
@@ -142,6 +148,29 @@ function CustomersTab() {
       });
     }
     qc.invalidateQueries({ queryKey: getListCustomersQueryKey() });
+  };
+
+  const openEdit = (c: { id: number; name: string; phone?: string | null }) => {
+    setEditCustomer({ id: c.id, name: c.name, phone: c.phone ?? "" });
+    setEditName(c.name);
+    setEditPhone(c.phone ?? "");
+    setEditError("");
+  };
+
+  const doEditSave = () => {
+    if (!editName.trim()) { setEditError("Name is required."); return; }
+    if (!editCustomer) return;
+    setEditError("");
+    updateCustomer.mutate(
+      { id: editCustomer.id, data: { name: editName.trim(), phone: editPhone.trim() || undefined } },
+      {
+        onSuccess: () => {
+          void qc.invalidateQueries({ queryKey: getListCustomersQueryKey() });
+          setEditCustomer(null);
+        },
+        onError: () => setEditError("Failed to update. Try again."),
+      }
+    );
   };
 
   return (
@@ -206,6 +235,14 @@ function CustomersTab() {
                 <p className="text-xs text-muted-foreground">{c.orderCount} order{c.orderCount !== 1 ? "s" : ""}</p>
               </div>
               <button
+                onClick={() => openEdit(c)}
+                disabled={busyIds.has(c.id)}
+                className="p-2 rounded-lg bg-secondary hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors disabled:opacity-40 shrink-0"
+                title="Edit customer"
+              >
+                <Pencil size={14} />
+              </button>
+              <button
                 onClick={() => setConfirmId(c.id)}
                 disabled={busyIds.has(c.id)}
                 className="p-2 rounded-lg bg-secondary hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors disabled:opacity-40 shrink-0"
@@ -215,6 +252,60 @@ function CustomersTab() {
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Edit customer modal */}
+      {editCustomer && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-card border border-card-border rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-foreground flex items-center gap-2">
+                <Users size={16} className="text-primary" />
+                Edit Customer
+              </h3>
+              <button onClick={() => setEditCustomer(null)} className="p-1 rounded-lg hover:bg-secondary text-muted-foreground">
+                <X size={15} />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Customer Name *</label>
+                <input
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && doEditSave()}
+                  className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Mobile Number</label>
+                <input
+                  type="tel"
+                  value={editPhone}
+                  onChange={e => setEditPhone(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && doEditSave()}
+                  className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+            </div>
+            {editError && <p className="text-xs text-destructive">{editError}</p>}
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setEditCustomer(null)}
+                className="flex-1 py-2.5 rounded-xl bg-secondary text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={doEditSave}
+                disabled={updateCustomer.isPending}
+                className="flex-[2] py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-all"
+              >
+                {updateCustomer.isPending ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
