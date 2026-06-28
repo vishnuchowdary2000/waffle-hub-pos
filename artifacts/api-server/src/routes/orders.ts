@@ -25,6 +25,7 @@ import {
   UpdateSubOrderStatusParams,
   UpdateSubOrderStatusBody,
   AddAddonItemsBody,
+  SmartEditOrderBody,
 } from "@workspace/api-zod";
 
 const EDITABLE_STATUSES = ["pending_payment", "approved", "preparing"];
@@ -477,6 +478,126 @@ router.put("/orders/:id/items", async (req, res): Promise<void> => {
   // Sync sub-orders to match the new item set (preserves existing sub-order statuses)
   const [currentOrder] = await db.select().from(ordersTable).where(eq(ordersTable.id, params.data.id));
   await syncSubOrders(params.data.id, currentOrder?.status ?? "pending_payment");
+
+  const full = await getFullOrder(params.data.id);
+  res.json(full);
+});
+
+// Smart edit — unified add/remove/qty/customer edit across all editable statuses
+router.patch("/orders/:id/smart-edit", async (req, res): Promise<void> => {
+  const params = GetOrderParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+  const parsed = SmartEditOrderBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, params.data.id));
+  if (!order) { res.status(404).json({ error: "Order not found" }); return; }
+  if (["completed", "cancelled"].includes(order.status)) {
+    res.status(409).json({ error: `Cannot edit order in status: ${order.status}` });
+    return;
+  }
+
+  const { items: requestItems, notes, customerName, customerPhone } = parsed.data;
+
+  // ── pending_payment: full atomic replace ──────────────────────────────────
+  if (order.status === "pending_payment") {
+    await db.delete(orderItemsTable).where(eq(orderItemsTable.orderId, params.data.id));
+    let total = 0;
+    if (requestItems.length > 0) {
+      await db.insert(orderItemsTable).values(
+        requestItems.map(item => ({
+          orderId: params.data.id,
+          productId: item.productId ?? null,
+          productName: item.productName,
+          price: String(item.price),
+          quantity: item.quantity,
+          itemOrderType: item.itemOrderType ?? "dine_in",
+        }))
+      );
+      total = requestItems.reduce((s, i) => s + i.price * i.quantity, 0);
+    }
+    const itemTypes = new Set(requestItems.map(i => i.itemOrderType ?? "dine_in"));
+    const newOrderType = itemTypes.size === 1 ? [...itemTypes][0]! : itemTypes.size > 1 ? "mixed" : order.orderType;
+    const upd: Record<string, unknown> = { totalAmount: String(total), orderType: newOrderType };
+    if (notes !== undefined) upd.notes = notes;
+    if (customerName !== undefined && customerName.trim()) upd.customerName = customerName.trim();
+    if (customerPhone !== undefined) upd.customerPhone = customerPhone || null;
+    await db.update(ordersTable).set(upd).where(eq(ordersTable.id, params.data.id));
+    await syncPaymentTotal(params.data.id, total);
+    await syncSubOrders(params.data.id, order.status);
+    const full = await getFullOrder(params.data.id);
+    res.json(full);
+    return;
+  }
+
+  // ── in-kitchen (approved / preparing / ready) ─────────────────────────────
+  // Items can only be removed/qty-changed when status is "approved" (not yet being prepared)
+  const canModifyExisting = order.status === "approved";
+
+  const dbItems = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, params.data.id));
+  const dbItemById = new Map(dbItems.map(i => [i.id, i]));
+
+  // Partition: request items that reference an existing DB item vs brand-new items
+  const existingInRequest = requestItems.filter(i => i.id != null && dbItemById.has(i.id!));
+  const newItems = requestItems.filter(i => i.id == null || !dbItemById.has(i.id!));
+
+  // Items in DB but absent from the request → user wants to remove
+  const requestedIds = new Set(existingInRequest.map(i => i.id!));
+  const removedItems = dbItems.filter(i => !requestedIds.has(i.id));
+
+  if (canModifyExisting) {
+    // Remove items the user deleted
+    for (const item of removedItems) {
+      await db.delete(orderItemsTable)
+        .where(and(eq(orderItemsTable.id, item.id), eq(orderItemsTable.orderId, params.data.id)));
+    }
+    // Update qty / itemOrderType for existing items
+    for (const reqItem of existingInRequest) {
+      if (reqItem.id == null) continue;
+      const dbItem = dbItemById.get(reqItem.id);
+      if (!dbItem) continue;
+      const newType = reqItem.itemOrderType ?? dbItem.itemOrderType;
+      if (dbItem.quantity !== reqItem.quantity || dbItem.itemOrderType !== newType) {
+        await db.update(orderItemsTable)
+          .set({ quantity: reqItem.quantity, itemOrderType: newType })
+          .where(eq(orderItemsTable.id, reqItem.id));
+      }
+    }
+  }
+
+  // Insert new items as add-ons (always allowed)
+  let hasAddons = false;
+  if (newItems.length > 0) {
+    hasAddons = true;
+    await db.insert(orderItemsTable).values(
+      newItems.map(item => ({
+        orderId: params.data.id,
+        productId: item.productId ?? null,
+        productName: item.productName,
+        price: String(item.price),
+        quantity: item.quantity,
+        itemOrderType: item.itemOrderType ?? order.orderType ?? "dine_in",
+        isAddon: true,
+      }))
+    );
+  }
+
+  // Recalculate total from all remaining items
+  const allItems = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, params.data.id));
+  const total = allItems.reduce((s, i) => s + Number(i.price) * i.quantity, 0);
+
+  const itemTypeSet = new Set(allItems.map(i => i.itemOrderType));
+  const newOrderType = itemTypeSet.size === 1 ? [...itemTypeSet][0]! : "mixed";
+
+  const upd: Record<string, unknown> = { totalAmount: String(total), orderType: newOrderType };
+  if (hasAddons) upd.status = "approved";
+  if (notes !== undefined) upd.notes = notes;
+  if (customerName !== undefined && customerName.trim()) upd.customerName = customerName.trim();
+  if (customerPhone !== undefined) upd.customerPhone = customerPhone || null;
+
+  await db.update(ordersTable).set(upd).where(eq(ordersTable.id, params.data.id));
+  await syncPaymentTotal(params.data.id, total);
+  await syncSubOrders(params.data.id, hasAddons ? "approved" : order.status);
 
   const full = await getFullOrder(params.data.id);
   res.json(full);

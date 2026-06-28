@@ -1,0 +1,188 @@
+UNIFIED EDIT ORDER WORKFLOW
+
+IMPORTANT
+
+Merge the current "Edit Order" and "Add Items" functionality into a single "Edit Order" button.
+
+Remove the separate "Add Items" button.
+
+Do not remove any existing functionality.
+
+---
+
+EDIT ORDER SHOULD SUPPORT
+
+1. Add new items
+
+2. Remove existing items
+
+3. Change quantity
+
+4. Change Dine In ↔ Takeaway
+
+5. Edit customer details
+
+6. Edit notes
+
+Everything should be handled from one Edit Order screen.
+
+---
+
+SMART SAVE LOGIC
+
+When Save is clicked, compare the updated order with the original order.
+
+Automatically determine:
+
+* Added Items
+* Removed Items
+* Quantity Changes
+* Order Type Changes
+
+The cashier should not need to choose between "Edit" or "Add Items".
+
+---
+
+KITCHEN WORKFLOW
+
+Already Prepared Items
+
+If an item has already been prepared or marked Ready:
+
+Do NOT send it to Kitchen again.
+
+---
+
+New Items
+
+Any newly added items should automatically create a new kitchen preparation task linked to the same order.
+
+Example:
+
+Order #0052
+
+Already Ready:
+
+* Dark Loaded Waffle
+
+Customer edits order and adds:
+
+* Oreo Waffle
+
+Kitchen should receive:
+
+ADD-ON TO ORDER #0052
+
+Items:
+
+* Oreo Waffle
+
+Only the new item should appear in the Pending → Start Preparing → Ready workflow.
+
+---
+
+REMOVED ITEMS
+
+If an item is removed before preparation begins:
+
+Remove it from the Kitchen queue.
+
+If it is already being prepared or marked Ready, follow the existing business rules.
+
+---
+
+DINE IN / TAKEAWAY CHANGES
+
+If an item's order type changes:
+
+Move it to the correct Kitchen workflow automatically.
+
+---
+
+PAYMENT
+
+Always keep:
+
+One customer
+
+One order
+
+One bill
+
+Recalculate automatically:
+
+* Total Amount
+* Amount Paid
+* Pending Amount
+
+---
+
+SELF TEST
+
+TEST 1
+
+Open Edit Order.
+
+Add a new item.
+
+Verify only the new item goes to the Kitchen as a new preparation task.
+
+---
+
+TEST 2
+
+Remove an unprepared item.
+
+Verify it disappears from the Kitchen queue.
+
+---
+
+TEST 3
+
+Change Dine In to Takeaway.
+
+Verify the Kitchen updates correctly.
+
+---
+
+TEST 4
+
+Change quantity.
+
+Verify only the quantity difference is reflected in the Kitchen.
+
+---
+
+TEST 5
+
+Verify:
+
+* Total Amount
+* Paid Amount
+* Pending Amount
+
+are recalculated correctly.
+
+---
+
+TEST 6
+
+Refresh all pages.
+
+Verify:
+
+* Counter
+* Kitchen
+* Order Queue
+
+remain synchronized.
+
+---
+
+IMPORTANT
+
+Do not redesign the Order Queue.
+
+Simply replace the separate "Add Items" button with a smarter "Edit Order" that performs both editing and item additions automatically.
+
+Do not mark this task complete until every self-test passes.

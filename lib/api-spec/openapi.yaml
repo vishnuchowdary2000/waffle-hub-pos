@@ -496,6 +496,33 @@ paths:
         "409":
           description: Order not in editable status
 
+  /orders/{id}/smart-edit:
+    patch:
+      operationId: smartEditOrder
+      tags: [orders]
+      summary: Unified smart edit — handles adds, removes, qty changes and customer details across all editable statuses
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SmartEditOrderInput"
+      responses:
+        "200":
+          description: Updated order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "409":
+          description: Order not editable
+
   /orders/{id}/addon-items:
     post:
       operationId: addAddonItems
@@ -1597,6 +1624,40 @@ components:
         itemOrderType: { type: string }
         notes:         { type: ["string", "null"] }
         isAddon:       { type: boolean }
+
+    SmartEditOrderInput:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SmartEditItem"
+        notes:
+          type: ["string", "null"]
+        customerName:
+          type: string
+        customerPhone:
+          type: ["string", "null"]
+
+    SmartEditItem:
+      type: object
+      required: [productName, price, quantity]
+      properties:
+        id:
+          type: ["integer", "null"]
+        productId:
+          type: ["integer", "null"]
+        productName:
+          type: string
+          minLength: 1
+        price:
+          type: number
+        quantity:
+          type: integer
+          minimum: 1
+        itemOrderType:
+          type: string
 
     AddAddonItemsInput:
       type: object

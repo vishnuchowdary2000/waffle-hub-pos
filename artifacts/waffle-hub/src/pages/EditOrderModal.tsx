@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   useListCategories,
   useListProducts,
-  useReplaceOrderItems,
+  useSmartEditOrder,
   getListOrdersQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,16 +17,21 @@ import {
   ShoppingBag,
   UtensilsCrossed,
   Pencil,
+  Lock,
+  UserRound,
+  CheckCircle,
 } from "lucide-react";
 
 type ItemOrderType = "dine_in" | "takeaway";
 
 type CartItem = {
+  id?: number;
   productId: number | null;
   productName: string;
   price: number;
   quantity: number;
   itemOrderType: ItemOrderType;
+  locked: boolean;
 };
 
 type OrderForEdit = {
@@ -35,6 +40,8 @@ type OrderForEdit = {
   status: string;
   orderType: string;
   notes?: string | null;
+  customerName: string;
+  customerPhone?: string | null;
   items: {
     id: number;
     productId?: number | null;
@@ -46,9 +53,10 @@ type OrderForEdit = {
 };
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
-  pending_payment: { label: "Pending Payment", color: "text-amber-400" },
-  approved: { label: "Approved", color: "text-violet-400" },
-  preparing: { label: "Preparing", color: "text-blue-400" },
+  pending_payment: { label: "Pending Payment",  color: "text-amber-400" },
+  approved:        { label: "In Kitchen",        color: "text-violet-400" },
+  preparing:       { label: "Preparing",         color: "text-blue-400" },
+  ready:           { label: "Ready",             color: "text-green-400" },
 };
 
 export default function EditOrderModal({
@@ -60,24 +68,32 @@ export default function EditOrderModal({
 }) {
   const qc = useQueryClient();
 
+  // Items in approved state can be removed/qty-changed; preparing/ready are locked
+  const canModifyExisting = order.status === "pending_payment" || order.status === "approved";
+
   const [cart, setCart] = useState<CartItem[]>(() =>
     order.items.map(i => ({
+      id: i.id,
       productId: i.productId ?? null,
       productName: i.productName,
       price: i.price,
       quantity: i.quantity,
       itemOrderType: i.itemOrderType === "takeaway" ? "takeaway" : "dine_in",
+      locked: !canModifyExisting,
     }))
   );
   const [notes, setNotes] = useState(order.notes ?? "");
+  const [customerName, setCustomerName] = useState(order.customerName ?? "");
+  const [customerPhone, setCustomerPhone] = useState(order.customerPhone ?? "");
   const [defaultItemType, setDefaultItemType] = useState<ItemOrderType>("dine_in");
   const [activeCategory, setActiveCategory] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [saved, setSaved] = useState(false);
 
   const { data: categories = [] } = useListCategories();
   const { data: allProducts = [] } = useListProducts({ active: true });
-  const replaceItems = useReplaceOrderItems();
+  const smartEdit = useSmartEditOrder();
 
   const products = allProducts.filter(p => {
     const matchesCat = activeCategory == null || p.categoryId === activeCategory;
@@ -88,7 +104,7 @@ export default function EditOrderModal({
   const addToCart = (p: (typeof allProducts)[number]) => {
     setCart(prev => {
       const existing = prev.findIndex(
-        c => c.productId === p.id && c.itemOrderType === defaultItemType
+        c => c.productId === p.id && c.itemOrderType === defaultItemType && !c.id
       );
       if (existing >= 0) {
         return prev.map((c, i) =>
@@ -103,12 +119,14 @@ export default function EditOrderModal({
           price: p.price,
           quantity: 1,
           itemOrderType: defaultItemType,
+          locked: false,
         },
       ];
     });
   };
 
   const updateQty = (idx: number, delta: number) => {
+    if (cart[idx]?.locked) return;
     setCart(prev => {
       const updated = [...prev];
       updated[idx] = { ...updated[idx], quantity: updated[idx].quantity + delta };
@@ -118,13 +136,14 @@ export default function EditOrderModal({
   };
 
   const toggleItemType = (idx: number) => {
+    if (cart[idx]?.locked) return;
     setCart(prev => {
       const item = prev[idx];
       const newType: ItemOrderType =
         item.itemOrderType === "dine_in" ? "takeaway" : "dine_in";
       const mergeIdx = prev.findIndex(
         (c, i) =>
-          i !== idx && c.productId === item.productId && c.itemOrderType === newType
+          i !== idx && c.productId === item.productId && c.itemOrderType === newType && !c.id
       );
       if (mergeIdx >= 0) {
         return prev
@@ -139,15 +158,19 @@ export default function EditOrderModal({
     });
   };
 
-  const removeItem = (idx: number) =>
+  const removeItem = (idx: number) => {
+    if (cart[idx]?.locked) return;
     setCart(prev => prev.filter((_, i) => i !== idx));
+  };
 
   const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
   const packagingCount = cart
     .filter(i => i.itemOrderType === "takeaway")
     .reduce((s, i) => s + i.quantity, 0);
-
   const itemCount = cart.reduce((s, i) => s + i.quantity, 0);
+
+  const newItemCount = cart.filter(i => !i.id).length;
+  const isKitchenOrder = !["pending_payment"].includes(order.status);
 
   const handleSave = () => {
     if (cart.length === 0) {
@@ -155,12 +178,15 @@ export default function EditOrderModal({
       return;
     }
     setErrorMsg("");
-    replaceItems.mutate(
+    smartEdit.mutate(
       {
         id: order.id,
         data: {
           notes: notes.trim() || null,
+          customerName: customerName.trim() || order.customerName,
+          customerPhone: customerPhone.trim() || null,
           items: cart.map(c => ({
+            id: c.id ?? null,
             productId: c.productId,
             productName: c.productName,
             price: c.price,
@@ -171,9 +197,9 @@ export default function EditOrderModal({
       },
       {
         onSuccess: () => {
-          // Invalidate ALL orders queries so both Queue and Kitchen refresh immediately.
           void qc.invalidateQueries({ queryKey: getListOrdersQueryKey() });
-          onClose();
+          setSaved(true);
+          setTimeout(onClose, 1000);
         },
         onError: () => {
           setErrorMsg("Failed to save. Please try again.");
@@ -183,6 +209,20 @@ export default function EditOrderModal({
   };
 
   const statusMeta = STATUS_META[order.status];
+
+  if (saved) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
+        <div className="bg-card border border-card-border rounded-2xl p-8 text-center shadow-2xl">
+          <CheckCircle size={48} className="text-green-400 mx-auto mb-3" />
+          <p className="text-xl font-bold text-foreground">
+            {newItemCount > 0 && isKitchenOrder ? "Sent to Kitchen!" : "Order Updated!"}
+          </p>
+          <p className="text-muted-foreground text-sm mt-1">{order.orderNumber}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -199,6 +239,9 @@ export default function EditOrderModal({
             {statusMeta && (
               <p className={cn("text-xs font-medium", statusMeta.color)}>
                 {statusMeta.label}
+                {!canModifyExisting && (
+                  <span className="text-muted-foreground ml-1.5">— existing items locked, you can add new ones</span>
+                )}
               </p>
             )}
           </div>
@@ -211,8 +254,32 @@ export default function EditOrderModal({
         </div>
 
         <div className="flex-1 overflow-y-auto">
+          {/* Customer details */}
+          <div className="px-4 pt-4 pb-2 space-y-2">
+            <div className="flex items-center gap-2">
+              <UserRound size={13} className="text-muted-foreground" />
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Customer</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                placeholder="Customer name"
+                value={customerName}
+                onChange={e => setCustomerName(e.target.value)}
+                className="bg-background border border-input rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <input
+                type="text"
+                placeholder="Phone (optional)"
+                value={customerPhone}
+                onChange={e => setCustomerPhone(e.target.value)}
+                className="bg-background border border-input rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+          </div>
+
           {/* Current cart items */}
-          <div className="p-4 pb-2 space-y-2">
+          <div className="px-4 py-2 space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               Items in order
             </p>
@@ -223,46 +290,63 @@ export default function EditOrderModal({
             ) : (
               cart.map((item, idx) => (
                 <div
-                  key={idx}
-                  className="bg-background rounded-lg px-3 py-2.5 border border-border space-y-1.5"
+                  key={`${item.id ?? "new"}-${idx}`}
+                  className={cn(
+                    "bg-background rounded-lg px-3 py-2.5 border space-y-1.5",
+                    item.locked ? "border-border/40 opacity-70" : "border-border",
+                    !item.id && "border-primary/30 bg-primary/5"
+                  )}
                 >
                   <div className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {item.productName}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {item.productName}
+                        </p>
+                        {!item.id && (
+                          <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded font-semibold shrink-0">NEW</span>
+                        )}
+                        {item.locked && (
+                          <Lock size={11} className="text-muted-foreground shrink-0" />
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {formatCurrency(item.price)} each
                       </p>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={() => updateQty(idx, -1)}
-                        className="w-6 h-6 rounded-md bg-secondary flex items-center justify-center hover:bg-secondary/80"
-                      >
-                        <Minus size={10} />
-                      </button>
+                      {!item.locked && (
+                        <button
+                          onClick={() => updateQty(idx, -1)}
+                          className="w-6 h-6 rounded-md bg-secondary flex items-center justify-center hover:bg-secondary/80"
+                        >
+                          <Minus size={10} />
+                        </button>
+                      )}
                       <span className="w-6 text-center text-sm font-bold">
                         {item.quantity}
                       </span>
                       <button
                         onClick={() => updateQty(idx, 1)}
-                        className="w-6 h-6 rounded-md bg-secondary flex items-center justify-center hover:bg-secondary/80"
+                        disabled={item.locked}
+                        className="w-6 h-6 rounded-md bg-secondary flex items-center justify-center hover:bg-secondary/80 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Plus size={10} />
                       </button>
-                      <button
-                        onClick={() => removeItem(idx)}
-                        className="w-6 h-6 rounded-md text-destructive/60 hover:text-destructive ml-1"
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                      {!item.locked && (
+                        <button
+                          onClick={() => removeItem(idx)}
+                          className="w-6 h-6 rounded-md text-destructive/60 hover:text-destructive ml-1"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
                     </div>
                     <span className="text-sm font-bold text-primary shrink-0">
                       {formatCurrency(item.price * item.quantity)}
                     </span>
                   </div>
-                  {order.orderType !== "delivery" && (
+                  {order.orderType !== "delivery" && !item.locked && (
                     <button
                       onClick={() => toggleItemType(idx)}
                       className={cn(
@@ -273,13 +357,9 @@ export default function EditOrderModal({
                       )}
                     >
                       {item.itemOrderType === "takeaway" ? (
-                        <>
-                          <ShoppingBag size={10} /> Takeaway
-                        </>
+                        <><ShoppingBag size={10} /> Takeaway</>
                       ) : (
-                        <>
-                          <UtensilsCrossed size={10} /> Dine In
-                        </>
+                        <><UtensilsCrossed size={10} /> Dine In</>
                       )}
                     </button>
                   )}
@@ -289,10 +369,10 @@ export default function EditOrderModal({
           </div>
 
           {/* Add items section */}
-          <div className="p-4 pt-2 space-y-2">
+          <div className="px-4 pt-2 pb-4 space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Add items
+                Add items{isKitchenOrder && " (add-on)"}
               </p>
               {order.orderType !== "delivery" && (
                 <div className="flex gap-1">
@@ -368,9 +448,8 @@ export default function EditOrderModal({
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {products.map(p => {
-                  const inCart = cart.find(c => c.productId === p.id);
-                  const totalQty = cart
-                    .filter(c => c.productId === p.id)
+                  const newQty = cart
+                    .filter(c => c.productId === p.id && !c.id)
                     .reduce((s, c) => s + c.quantity, 0);
                   return (
                     <button
@@ -378,15 +457,15 @@ export default function EditOrderModal({
                       onClick={() => addToCart(p)}
                       className={cn(
                         "relative rounded-xl p-3 text-left border transition-all active:scale-95",
-                        inCart
+                        newQty > 0
                           ? "bg-primary/15 border-primary/50"
                           : "bg-card border-card-border hover:border-primary/30"
                       )}
                     >
-                      {inCart && (
+                      {newQty > 0 && (
                         <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
                           <span className="text-primary-foreground text-xs font-bold">
-                            {totalQty}
+                            {newQty}
                           </span>
                         </div>
                       )}
@@ -417,6 +496,12 @@ export default function EditOrderModal({
 
         {/* Footer */}
         <div className="p-4 border-t border-border shrink-0 space-y-3">
+          {isKitchenOrder && newItemCount > 0 && (
+            <div className="flex items-center gap-1.5 text-xs text-violet-400 bg-violet-500/10 border border-violet-500/20 rounded-lg px-3 py-2">
+              <Plus size={12} />
+              <span>{newItemCount} new item{newItemCount !== 1 ? "s" : ""} will be sent to Kitchen as add-on</span>
+            </div>
+          )}
           {packagingCount > 0 && (
             <div className="flex items-center gap-1.5 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
               <ShoppingBag size={12} />
@@ -443,10 +528,14 @@ export default function EditOrderModal({
             </button>
             <button
               onClick={handleSave}
-              disabled={cart.length === 0 || replaceItems.isPending}
+              disabled={cart.length === 0 || smartEdit.isPending}
               className="flex-[2] py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             >
-              {replaceItems.isPending ? "Saving..." : "Save Changes"}
+              {smartEdit.isPending
+                ? "Saving..."
+                : isKitchenOrder && newItemCount > 0
+                  ? `Save & Send ${newItemCount} to Kitchen`
+                  : "Save Changes"}
             </button>
           </div>
         </div>

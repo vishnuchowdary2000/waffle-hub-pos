@@ -74,6 +74,7 @@ import type {
   PublicStats,
   ReplaceOrderItemsInput,
   ReportSummary,
+  SmartEditOrderInput,
   StoreAnnouncement,
   StoreAnnouncementInput,
   StoreSettings,
@@ -1813,6 +1814,78 @@ export const useReplaceOrderItems = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getReplaceOrderItemsMutationOptions(options));
+    }
+
+export const getSmartEditOrderUrl = (id: number,) => {
+
+
+
+
+  return `/api/orders/${id}/smart-edit`
+}
+
+/**
+ * @summary Unified smart edit — handles adds, removes, qty changes and customer details across all editable statuses
+ */
+export const smartEditOrder = async (id: number,
+    smartEditOrderInput: SmartEditOrderInput, options?: RequestInit): Promise<Order> => {
+
+  return customFetch<Order>(getSmartEditOrderUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      smartEditOrderInput,)
+  }
+);}
+
+
+
+
+export const getSmartEditOrderMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof smartEditOrder>>, TError,{id: number;data: BodyType<SmartEditOrderInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof smartEditOrder>>, TError,{id: number;data: BodyType<SmartEditOrderInput>}, TContext> => {
+
+const mutationKey = ['smartEditOrder'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof smartEditOrder>>, {id: number;data: BodyType<SmartEditOrderInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  smartEditOrder(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SmartEditOrderMutationResult = NonNullable<Awaited<ReturnType<typeof smartEditOrder>>>
+    export type SmartEditOrderMutationBody = BodyType<SmartEditOrderInput>
+    export type SmartEditOrderMutationError = ErrorType<void>
+
+    /**
+ * @summary Unified smart edit — handles adds, removes, qty changes and customer details across all editable statuses
+ */
+export const useSmartEditOrder = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof smartEditOrder>>, TError,{id: number;data: BodyType<SmartEditOrderInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof smartEditOrder>>,
+        TError,
+        {id: number;data: BodyType<SmartEditOrderInput>},
+        TContext
+      > => {
+      return useMutation(getSmartEditOrderMutationOptions(options));
     }
 
 export const getAddAddonItemsUrl = (id: number,) => {

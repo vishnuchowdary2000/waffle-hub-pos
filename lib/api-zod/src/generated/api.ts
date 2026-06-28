@@ -729,6 +729,90 @@ export const ReplaceOrderItemsResponse = zod.object({
 
 
 /**
+ * @summary Unified smart edit — handles adds, removes, qty changes and customer details across all editable statuses
+ */
+export const SmartEditOrderParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+
+export const SmartEditOrderBody = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number().nullish(),
+  "productId": zod.number().nullish(),
+  "productName": zod.string().min(1),
+  "price": zod.number(),
+  "quantity": zod.number().min(1),
+  "itemOrderType": zod.string().optional()
+})),
+  "notes": zod.string().nullish(),
+  "customerName": zod.string().optional(),
+  "customerPhone": zod.string().nullish()
+})
+
+export const SmartEditOrderResponse = zod.object({
+  "id": zod.number(),
+  "orderNumber": zod.string(),
+  "customerId": zod.number().nullish(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string().nullish(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "notes": zod.string().nullish(),
+  "priority": zod.boolean().optional(),
+  "totalAmount": zod.number(),
+  "subtotalAmount": zod.number().optional(),
+  "discountAmount": zod.number().optional(),
+  "offerId": zod.number().nullish(),
+  "source": zod.string().optional(),
+  "tableNumber": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "readyTime": zod.string(),
+  "updatedAt": zod.string().optional(),
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "productId": zod.number().nullish(),
+  "productName": zod.string(),
+  "price": zod.number(),
+  "quantity": zod.number(),
+  "itemOrderType": zod.string(),
+  "notes": zod.string().nullish(),
+  "isAddon": zod.boolean().optional()
+})),
+  "payment": zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "totalAmount": zod.number(),
+  "cashAmount": zod.number(),
+  "upiAmount": zod.number(),
+  "cardAmount": zod.number(),
+  "discountType": zod.string().nullable(),
+  "discountValue": zod.number(),
+  "discountAmount": zod.number(),
+  "charityAmount": zod.number(),
+  "finalAmount": zod.number(),
+  "totalPaid": zod.number(),
+  "balance": zod.number(),
+  "status": zod.string(),
+  "createdAt": zod.string()
+}).optional(),
+  "subOrders": zod.array(zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "subCode": zod.string(),
+  "orderType": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})).optional()
+})
+
+
+/**
  * @summary Append addon items to an unpaid order in the kitchen
  */
 export const AddAddonItemsParams = zod.object({

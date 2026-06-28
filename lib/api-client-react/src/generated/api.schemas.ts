@@ -209,6 +209,28 @@ export interface OrderStatusUpdate {
   status: string;
 }
 
+export interface SmartEditItem {
+  /** @nullable */
+  id?: number | null;
+  /** @nullable */
+  productId?: number | null;
+  /** @minLength 1 */
+  productName: string;
+  price: number;
+  /** @minimum 1 */
+  quantity: number;
+  itemOrderType?: string;
+}
+
+export interface SmartEditOrderInput {
+  items: SmartEditItem[];
+  /** @nullable */
+  notes?: string | null;
+  customerName?: string;
+  /** @nullable */
+  customerPhone?: string | null;
+}
+
 export interface AddAddonItemsInput {
   items: OrderItemInput[];
 }

@@ -65,6 +65,8 @@ export * from './publicMenuProduct';
 export * from './publicStats';
 export * from './replaceOrderItemsInput';
 export * from './reportSummary';
+export * from './smartEditItem';
+export * from './smartEditOrderInput';
 export * from './storeAnnouncement';
 export * from './storeAnnouncementInput';
 export * from './storeSettings';
