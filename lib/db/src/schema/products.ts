@@ -9,6 +9,7 @@ export const productsTable = pgTable("products", {
   description: text("description"),
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
   active: boolean("active").notNull().default(true),
+  isVeg: boolean("is_veg").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

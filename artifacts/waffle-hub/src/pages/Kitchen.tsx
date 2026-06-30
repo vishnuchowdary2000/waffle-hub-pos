@@ -18,8 +18,10 @@ import { type PaperSize, printKOT } from "@/lib/printService";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Clock, RefreshCw, ChefHat, ShoppingBag, Printer,
-  UtensilsCrossed, Zap, Sparkles, ClipboardList,
+  UtensilsCrossed, Zap, Sparkles, ClipboardList, Leaf, Drumstick,
 } from "lucide-react";
+
+type VegFilter = "all" | "veg" | "non_veg";
 
 const ACTIVE_STATUSES = "approved,preparing,ready";
 const NEW_ITEM_TTL_MS = 45_000;
@@ -95,6 +97,13 @@ export default function Kitchen() {
   const orderItemSnapshot = useRef<Map<number, Set<number>>>(new Map());
   const [newItemHighlights, setNewItemHighlights] = useState<Map<number, number>>(new Map());
   const [tick, setTick] = useState(0);
+  const [vegFilter, setVegFilter] = useState<VegFilter>(() => {
+    return (localStorage.getItem("kitchen_veg_filter") as VegFilter) ?? "all";
+  });
+  const setAndPersistVegFilter = (f: VegFilter) => {
+    setVegFilter(f);
+    localStorage.setItem("kitchen_veg_filter", f);
+  };
 
   const { data: orders = [], isLoading } = useListOrders(
     { status: ACTIVE_STATUSES },
@@ -230,6 +239,25 @@ export default function Kitchen() {
     return { byId, byName };
   }, [products]);
 
+  // productId → isVeg (for kitchen veg/non-veg filtering)
+  const productIsVegMap = useMemo(() => {
+    const m = new Map<number, boolean>();
+    for (const p of products) {
+      if (p.id != null) m.set(p.id, p.isVeg);
+    }
+    return m;
+  }, [products]);
+
+  const isItemVeg = (item: Order["items"][number]): boolean => {
+    if (item.productId != null) return productIsVegMap.get(item.productId) ?? true;
+    return true; // unknown items default to veg (inclusive)
+  };
+
+  const applyVegFilter = (items: Order["items"]) => {
+    if (vegFilter === "all") return items;
+    return items.filter(i => isItemVeg(i) === (vegFilter === "veg"));
+  };
+
   // Pending summary: sum item quantities from approved-only cards, grouped by category
   const pendingSummary = useMemo(() => {
     const getCat = (item: { productId?: number | null; productName: string }) => {
@@ -270,30 +298,40 @@ export default function Kitchen() {
 
   const kotPrinting = settings?.kotPrinting ?? false;
 
-  const renderCard = (item: KitchenItem) =>
-    item.kind === "sub" ? (
-      <KitchenCard
-        key={`sub-${item.subOrder.id}`}
-        order={item.order}
-        highlightedItemIds={highlightedItemIds}
-        subOrder={item.subOrder}
-        subItems={item.order.items.filter(i => i.itemOrderType === item.subOrder.orderType)}
-        onPrepare={() => changeSubStatus(item.subOrder.id, "preparing")}
-        onReady={() => changeSubStatus(item.subOrder.id, "ready")}
-        kotPrinting={kotPrinting}
-        onPrintKOT={() => handlePrintKOT(item.order, item.subOrder)}
-      />
-    ) : (
+  const renderCard = (item: KitchenItem) => {
+    if (item.kind === "sub") {
+      const rawSubItems = item.order.items.filter(i => i.itemOrderType === item.subOrder.orderType);
+      const filteredSubItems = applyVegFilter(rawSubItems);
+      if (filteredSubItems.length === 0) return null;
+      return (
+        <KitchenCard
+          key={`sub-${item.subOrder.id}`}
+          order={item.order}
+          highlightedItemIds={highlightedItemIds}
+          subOrder={item.subOrder}
+          subItems={filteredSubItems}
+          onPrepare={() => changeSubStatus(item.subOrder.id, "preparing")}
+          onReady={() => changeSubStatus(item.subOrder.id, "ready")}
+          kotPrinting={kotPrinting}
+          onPrintKOT={() => handlePrintKOT(item.order, item.subOrder)}
+        />
+      );
+    }
+    const filteredItems = applyVegFilter(item.order.items);
+    if (filteredItems.length === 0) return null;
+    return (
       <KitchenCard
         key={`order-${item.order.id}`}
         order={item.order}
         highlightedItemIds={highlightedItemIds}
+        overrideItems={vegFilter !== "all" ? filteredItems : undefined}
         onPrepare={() => changeStatus(item.order.id, "preparing")}
         onReady={() => changeStatus(item.order.id, "ready")}
         kotPrinting={kotPrinting}
         onPrintKOT={() => handlePrintKOT(item.order)}
       />
     );
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -313,9 +351,47 @@ export default function Kitchen() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-          Live
+        <div className="flex items-center gap-2">
+          {/* Veg / Non-Veg filter tabs */}
+          <div className="flex items-center bg-secondary rounded-lg p-0.5 gap-0.5">
+            <button
+              onClick={() => setAndPersistVegFilter("all")}
+              className={cn(
+                "px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors",
+                vegFilter === "all"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setAndPersistVegFilter("veg")}
+              className={cn(
+                "flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors",
+                vegFilter === "veg"
+                  ? "bg-green-600/20 text-green-400 shadow-sm"
+                  : "text-muted-foreground hover:text-green-400"
+              )}
+            >
+              <Leaf size={11} /> Veg
+            </button>
+            <button
+              onClick={() => setAndPersistVegFilter("non_veg")}
+              className={cn(
+                "flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors",
+                vegFilter === "non_veg"
+                  ? "bg-red-600/20 text-red-400 shadow-sm"
+                  : "text-muted-foreground hover:text-red-400"
+              )}
+            >
+              <Drumstick size={11} /> Non-Veg
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            Live
+          </div>
         </div>
       </div>
 
@@ -491,6 +567,7 @@ function KitchenCard({
   onReady,
   subOrder,
   subItems,
+  overrideItems,
   kotPrinting,
   onPrintKOT,
 }: {
@@ -500,6 +577,7 @@ function KitchenCard({
   onReady: () => void;
   subOrder?: SubOrder;
   subItems?: Order["items"];
+  overrideItems?: Order["items"];
   kotPrinting?: boolean;
   onPrintKOT?: () => void;
 }) {
@@ -507,7 +585,8 @@ function KitchenCard({
   const isSubMode = !!subOrder;
   const displayStatus = isSubMode ? subOrder!.status : order.status;
   const displayType   = isSubMode ? subOrder!.orderType : order.orderType;
-  const displayItems  = isSubMode ? (subItems ?? []) : order.items;
+  const baseItems     = isSubMode ? (subItems ?? []) : (overrideItems ?? order.items);
+  const displayItems  = baseItems;
   const originalItems = displayItems.filter(i => !i.isAddon);
   const addonItems    = displayItems.filter(i => i.isAddon);
   const displayNumber = isSubMode
@@ -527,7 +606,7 @@ function KitchenCard({
   const typeBadge = ORDER_TYPE_BADGE[isMixed ? "mixed" : displayType] ?? ORDER_TYPE_BADGE.dine_in;
   const subCodeMeta = subOrder ? (SUB_CODE_META[subOrder.subCode] ?? SUB_CODE_META.A) : null;
 
-  const allItems   = order.items;
+  const allItems      = overrideItems ?? order.items;
   const dineInItems   = isMixed ? allItems.filter(i => i.itemOrderType !== "takeaway") : [];
   const takeawayItems = isMixed ? allItems.filter(i => i.itemOrderType === "takeaway") : [];
 

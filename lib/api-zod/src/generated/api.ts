@@ -274,6 +274,7 @@ export const ListProductsResponseItem = zod.object({
   "description": zod.string().nullish(),
   "price": zod.number(),
   "active": zod.boolean(),
+  "isVeg": zod.boolean(),
   "createdAt": zod.string()
 })
 export const ListProductsResponse = zod.array(ListProductsResponseItem)
@@ -289,7 +290,8 @@ export const CreateProductBody = zod.object({
   "name": zod.string().min(1),
   "description": zod.string().optional(),
   "price": zod.number().min(createProductBodyPriceMin),
-  "active": zod.boolean().optional()
+  "active": zod.boolean().optional(),
+  "isVeg": zod.boolean().optional()
 })
 
 
@@ -307,7 +309,8 @@ export const UpdateProductBody = zod.object({
   "name": zod.string().min(1).optional(),
   "description": zod.string().nullish(),
   "price": zod.number().min(updateProductBodyPriceMin).optional(),
-  "active": zod.boolean().optional()
+  "active": zod.boolean().optional(),
+  "isVeg": zod.boolean().optional()
 })
 
 export const UpdateProductResponse = zod.object({
@@ -318,6 +321,7 @@ export const UpdateProductResponse = zod.object({
   "description": zod.string().nullish(),
   "price": zod.number(),
   "active": zod.boolean(),
+  "isVeg": zod.boolean(),
   "createdAt": zod.string()
 })
 

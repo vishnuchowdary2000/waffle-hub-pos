@@ -15,4 +15,5 @@ export interface ProductInput {
   /** @minimum 0 */
   price: number;
   active?: boolean;
+  isVeg?: boolean;
 }

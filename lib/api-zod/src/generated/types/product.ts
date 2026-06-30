@@ -17,5 +17,6 @@ export interface Product {
   description?: string | null;
   price: number;
   active: boolean;
+  isVeg: boolean;
   createdAt: string;
 }

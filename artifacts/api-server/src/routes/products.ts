@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db, productsTable, categoriesTable } from "@workspace/db";
 import {
   CreateProductBody,
@@ -7,8 +7,6 @@ import {
   UpdateProductBody,
   DeleteProductParams,
   ListProductsQueryParams,
-  ListProductsResponse,
-  UpdateProductResponse,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -29,6 +27,7 @@ router.get("/products", async (req, res): Promise<void> => {
       description: productsTable.description,
       price: productsTable.price,
       active: productsTable.active,
+      isVeg: productsTable.isVeg,
       createdAt: productsTable.createdAt,
     })
     .from(productsTable)
@@ -48,8 +47,9 @@ router.post("/products", async (req, res): Promise<void> => {
     description: parsed.data.description ?? null,
     price: String(parsed.data.price),
     active: parsed.data.active ?? true,
+    isVeg: parsed.data.isVeg ?? true,
   }).returning();
-  res.status(201).json({ ...row, price: Number(row.price) });
+  res.status(201).json({ ...row, price: Number(row.price), createdAt: row.createdAt.toISOString() });
 });
 
 router.patch("/products/:id", async (req, res): Promise<void> => {
@@ -63,6 +63,7 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
   if (parsed.data.description !== undefined) updateData.description = parsed.data.description;
   if (parsed.data.price != null) updateData.price = String(parsed.data.price);
   if (parsed.data.active != null) updateData.active = parsed.data.active;
+  if (parsed.data.isVeg != null) updateData.isVeg = parsed.data.isVeg;
   const [row] = await db.update(productsTable).set(updateData).where(eq(productsTable.id, params.data.id)).returning();
   if (!row) { res.status(404).json({ error: "Product not found" }); return; }
   res.json({ ...row, price: Number(row.price), createdAt: row.createdAt.toISOString() });

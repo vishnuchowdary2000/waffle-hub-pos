@@ -16,4 +16,5 @@ export interface ProductUpdate {
   /** @minimum 0 */
   price?: number;
   active?: boolean;
+  isVeg?: boolean;
 }

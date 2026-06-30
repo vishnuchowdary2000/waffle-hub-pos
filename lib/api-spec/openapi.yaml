@@ -1477,7 +1477,7 @@ components:
     # ── Product ───────────────────────────────────────────────────────────────
     Product:
       type: object
-      required: [id, name, price, active, createdAt]
+      required: [id, name, price, active, isVeg, createdAt]
       properties:
         id:          { type: integer }
         categoryId:  { type: ["integer", "null"] }
@@ -1486,6 +1486,7 @@ components:
         description: { type: ["string", "null"] }
         price:       { type: number }
         active:      { type: boolean }
+        isVeg:       { type: boolean }
         createdAt:   { type: string }
 
     ProductInput:
@@ -1497,6 +1498,7 @@ components:
         description: { type: string }
         price:       { type: number, minimum: 0 }
         active:      { type: boolean }
+        isVeg:       { type: boolean }
 
     ProductUpdate:
       type: object
@@ -1506,6 +1508,7 @@ components:
         description: { type: ["string", "null"] }
         price:       { type: number, minimum: 0 }
         active:      { type: boolean }
+        isVeg:       { type: boolean }
 
     # ── Order ─────────────────────────────────────────────────────────────────
     Order:
