@@ -363,8 +363,8 @@ export default function Queue() {
                       </button>
                     )}
 
-                    {/* Collect Payment */}
-                    {(order.status === "pending_payment" || order.payment?.status !== "paid") && (
+                    {/* Collect Payment — show whenever there is any unpaid balance */}
+                    {(order.status === "pending_payment" || !order.payment || order.payment.balance > 0) && (
                       <button
                         onClick={() => navigate(`/billing/${order.id}`)}
                         disabled={isBusy}
